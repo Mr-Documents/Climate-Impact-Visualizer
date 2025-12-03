@@ -1,12 +1,40 @@
 import React from "react";
-import { FaFire, FaCloudRain, FaWater, FaMapMarkedAlt, FaTachometerAlt } from "react-icons/fa";
+import { 
+  FaFire, 
+  FaCloudRain, 
+  FaWater, 
+  FaMapMarkedAlt, 
+  FaTachometerAlt 
+} from "react-icons/fa";
 
 /**
  * WeatherIcon Component
- * @param {string} type - "wildfire", "flood", "rain", "map", "dashboard"
- * @param {number} size - icon size in px
+ *
+ * Supports 2 modes:
+ * 1. type="wildfire" | "flood" | "rain" | "map" | "dashboard"
+ * 2. precipitation={number} → auto-select rain icon
+ *
+ * @param {string} type      - specific icon type
+ * @param {number} size      - icon size in px
+ * @param {number} precipitation - optional, auto selects rain intensity icon
  */
-function WeatherIcon({ type, size = 24 }) {
+function WeatherIcon({ type, size = 24, precipitation = null }) {
+  
+  // --- AUTO MODE: If precipitation is provided, choose icon dynamically ---
+  if (precipitation !== null) {
+    if (precipitation > 5) {
+      return <FaCloudRain size={size} color="#0d6efd" />; // heavy rain (blue)
+    }
+    if (precipitation > 0.2) {
+      return <FaCloudRain size={size} color="#20c997" />; // normal rain (green)
+    }
+    if (precipitation > 0) {
+      return <FaCloudRain size={size} color="#6c757d" />; // drizzle (gray)
+    }
+    return <FaCloudRain size={size} color="#adb5bd" />; // no-rain faded
+  }
+
+  // --- STATIC ICON MODE ---
   switch (type) {
     case "wildfire":
       return <FaFire size={size} color="#dc3545" />; // red
@@ -19,8 +47,9 @@ function WeatherIcon({ type, size = 24 }) {
     case "dashboard":
       return <FaTachometerAlt size={size} color="#6610f2" />; // purple
     default:
-      return <FaMapMarkedAlt size={size} />; // fallback icon
+      return <FaMapMarkedAlt size={size} />; // fallback
   }
 }
 
 export default WeatherIcon;
+

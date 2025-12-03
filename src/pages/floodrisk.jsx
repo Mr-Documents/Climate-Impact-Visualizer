@@ -1,4 +1,3 @@
-// src/pages/FloodRiskPage.jsx
 import React, { useState } from "react";
 import CoordinateForm from "../components/forms/coordinateform";
 import UnifiedMap from "../components/map/mapview";
@@ -7,9 +6,9 @@ import axios from "axios";
 import ResultCard from "../components/reusable/resultcard";
 
 const FloodRiskPage = () => {
+  const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
 
   const handleAnalyze = async (lat, lon) => {
     setCoords({ lat, lon });
@@ -37,7 +36,7 @@ const FloodRiskPage = () => {
         Flood Risk Analysis
       </h2>
 
-      {/* Coordinates Form */}
+      {/* Coordinates Form — Now identical to PrecipitationPage */}
       <CoordinateForm
         onSubmit={handleAnalyze}
         loading={loading}
@@ -53,8 +52,12 @@ const FloodRiskPage = () => {
         </div>
       )}
 
-      {/* Map */}
-      <UnifiedMap lat={coords.lat} lon={coords.lon} />
+      {/* Map — now clickable like precipitation page */}
+      <UnifiedMap
+        lat={coords.lat}
+        lon={coords.lon}
+        onSelect={(lat, lon) => setCoords({ lat, lon })}
+      />
 
       {/* Results */}
       {result && (
@@ -83,4 +86,3 @@ const FloodRiskPage = () => {
 };
 
 export default FloodRiskPage;
-

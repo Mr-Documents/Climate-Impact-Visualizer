@@ -5,7 +5,7 @@ import UnifiedMap from "../components/map/mapview";
 import WeatherIcon from "../components/ui/weathericon";
 import { Line } from "react-chartjs-2";
 
-// Chart.js registration (required in v4+)
+// Chart.js registration
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -41,14 +41,24 @@ const Dashboard = () => {
         axios.get(`http://localhost:5000/api/floodrisk?lat=${lat}&lon=${lon}&ai=true`)
       ]);
 
-      console.log("Rain data:", rainRes.data);
-      console.log("Wildfire data:", wildRes.data);
-      console.log("Flood data:", floodRes.data);
+      // Safely extract rain data
+      const hourlyRain = Array.isArray(rainRes.data?.series)
+        ? rainRes.data.series.map(s => s.precipitation).slice(0, 24)
+        : [];
 
-      // --- Corrected keys ---
-      setRainData(rainRes.data?.hourly?.precipitation?.slice(0, 24) || []);
-      setWildfireRisk(wildRes.data?.wildfireRisk || "N/A");
-      setFloodRisk(floodRes.data?.floodRisk || "N/A");
+      setRainData(hourlyRain);
+
+      // Wildfire risk: fallback to "N/A" if missing
+      const wfRisk = wildRes.data?.wildfireRisk;
+      setWildfireRisk(
+        wfRisk && typeof wfRisk === "string" ? wfRisk : "N/A"
+      );
+
+      // Flood risk: fallback to "N/A" if missing
+      const flRisk = floodRes.data?.floodRisk;
+      setFloodRisk(
+        flRisk && typeof flRisk === "string" ? flRisk : "N/A"
+      );
 
     } catch (error) {
       console.error("Dashboard fetch error:", error);
@@ -73,7 +83,7 @@ const Dashboard = () => {
       )}
 
       <div className="row gx-4 gy-4">
-        {/* --- MAP --- */}
+        {/* MAP */}
         <div className="col-lg-8">
           <div className="card shadow-sm">
             <div className="card-body">
@@ -86,7 +96,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* --- RISK CARDS --- */}
+        {/* RISK CARDS */}
         <div className="col-lg-4 d-flex flex-column gap-3">
           <div className="card shadow-sm p-3">
             <h6 className="d-flex align-items-center gap-2">
@@ -110,12 +120,12 @@ const Dashboard = () => {
               24-hr Rainfall Total
             </h6>
             <p className="fs-4 fw-bold">
-              {rainData.reduce((a, b) => a + b, 0).toFixed(1)} mm
+              {rainData.length > 0 ? rainData.reduce((a, b) => a + b, 0).toFixed(1) : "0.0"} mm
             </p>
           </div>
         </div>
 
-        {/* --- RAINFALL CHART --- */}
+        {/* RAINFALL CHART */}
         <div className="col-12">
           <div className="card shadow-sm">
             <div className="card-body">
@@ -140,9 +150,7 @@ const Dashboard = () => {
                 }}
                 options={{
                   responsive: true,
-                  plugins: {
-                    legend: { display: true },
-                  },
+                  plugins: { legend: { display: true } },
                   scales: {
                     x: { title: { display: true, text: "Hour" } },
                     y: { title: { display: true, text: "Rainfall (mm)" } },
