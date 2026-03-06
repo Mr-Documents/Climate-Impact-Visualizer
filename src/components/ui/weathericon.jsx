@@ -1,6 +1,5 @@
 import React from "react";
 import { 
-  FaFire, 
   FaCloudRain, 
   FaWater, 
   FaMapMarkedAlt, 
@@ -11,7 +10,7 @@ import {
  * WeatherIcon Component
  *
  * Supports 2 modes:
- * 1. type="wildfire" | "flood" | "rain" | "map" | "dashboard"
+ * 1. type="flood" | "rain" | "map" | "dashboard"
  * 2. precipitation={number} → auto-select rain icon
  *
  * @param {string} type      - specific icon type
@@ -36,8 +35,6 @@ function WeatherIcon({ type, size = 24, precipitation = null }) {
 
   // --- STATIC ICON MODE ---
   switch (type) {
-    case "wildfire":
-      return <FaFire size={size} color="#dc3545" />; // red
     case "flood":
       return <FaWater size={size} color="#0d6efd" />; // blue
     case "rain":

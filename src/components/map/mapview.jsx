@@ -1,7 +1,9 @@
+// src/components/map/mapview.jsx
 import React, { useState } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+
 
 // Fix marker icon issue with Leaflet in React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -17,7 +19,7 @@ function ClickableMarker({ onSelect, initialPosition }) {
 
   useMapEvents({
     click(e) {
-      if (!onSelect) return; // Only respond if interactive
+      if (!onSelect) return;
       const { lat, lng } = e.latlng;
       setPosition([lat, lng]);
       onSelect(lat, lng);
@@ -33,13 +35,15 @@ function ClickableMarker({ onSelect, initialPosition }) {
  * @param {number} lat - initial latitude
  * @param {number} lon - initial longitude
  * @param {function} onSelect - optional callback when user clicks map
+ * @param {ReactNode} children - optional overlays like FireSimulation / DrynessHeatmap
  */
-function UnifiedMap({ lat = 5.6037, lon = -0.1870, onSelect }) {
+function UnifiedMap({ lat = 5.6037, lon = -0.1870, onSelect, children }) {
   return (
     <div style={{ height: "400px", width: "100%", marginTop: "20px" }}>
       <MapContainer center={[lat, lon]} zoom={7} style={{ height: "100%", width: "100%" }}>
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <ClickableMarker onSelect={onSelect} initialPosition={[lat, lon]} />
+        {children /* Render FireSimulation, DrynessHeatmap, etc. */}
       </MapContainer>
     </div>
   );

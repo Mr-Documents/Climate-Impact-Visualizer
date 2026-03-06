@@ -1,5 +1,5 @@
 // Updated Dashboard.jsx with improved UI and restored descriptive texts
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
 import WeatherIcon from "../components/ui/weathericon";
@@ -35,20 +35,15 @@ const Dashboard = () => {
   const [windData, setWindData] = useState([]);
   const [hourLabels, setHourLabels] = useState([]);
 
-  const [wildfireRisk, setWildfireRisk] = useState("N/A");
   const [floodRisk, setFloodRisk] = useState("N/A");
 
-  useEffect(() => {
-    fetchAllData(coords.lat, coords.lon);
-  }, []);
-
-  const fetchAllData = async (lat, lon) => {
+  const fetchAllData = useCallback(async (lat, lon) => {
     setLoading(true);
 
     try {
-      const [rainRes, wildRes, floodRes] = await Promise.all([
+      const [rainRes, weatherRes, floodRes] = await Promise.all([
         axios.get(`http://localhost:5000/api/precipitation?lat=${lat}&lon=${lon}`),
-        axios.get(`http://localhost:5000/api/wildfirerisk?lat=${lat}&lon=${lon}&ai=true`),
+        axios.get(`http://localhost:5000/api/weather?lat=${lat}&lon=${lon}`),
         axios.get(`http://localhost:5000/api/floodrisk?lat=${lat}&lon=${lon}&ai=true`)
       ]);
 
@@ -58,15 +53,12 @@ const Dashboard = () => {
       setRainData(hourly.map(s => s.precipitation ?? 0));
       setHourLabels(hourly.map((_, i) => `${i}:00`));
 
-      const climateInputs = wildRes.data?.inputs || {};
+      const weatherSeries = weatherRes.data?.series || [];
+      const weatherHourly = weatherSeries.slice(0, 24);
 
-      const temp = climateInputs.temperature ?? 0;
-      const wind = climateInputs.windSpeed ?? 0;
+      setTempData(weatherHourly.map(s => s.temperature ?? 0));
+      setWindData(weatherHourly.map(s => s.windSpeed ?? 0));
 
-      setTempData(Array(24).fill(temp));
-      setWindData(Array(24).fill(wind));
-
-      setWildfireRisk(wildRes.data?.wildfireRisk || "N/A");
       setFloodRisk(floodRes.data?.floodRisk || "N/A");
 
     } catch (error) {
@@ -75,7 +67,11 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchAllData(coords.lat, coords.lon);
+  }, [coords.lat, coords.lon, fetchAllData]);
 
   return (
     <div className="container py-4">
@@ -108,7 +104,6 @@ const Dashboard = () => {
                 lon={coords.lon}
                 onSelect={(lat, lon) => {
                   setCoords({ lat, lon });
-                  fetchAllData(lat, lon);
                 }}
               />
             </div>
@@ -117,14 +112,6 @@ const Dashboard = () => {
 
         <div className="col-lg-4 d-flex flex-column gap-3">
 
-          <div className="card shadow-sm p-3 border-0">
-            <h6 className="d-flex align-items-center gap-2 fw-bold">
-              <WeatherIcon type="wildfire" size={28} />
-              Wildfire Risk
-            </h6>
-            <p className="fs-4 fw-bold text-danger">{wildfireRisk}</p>
-            <p className="text-muted small">High temperatures, dry conditions, and strong winds increase wildfire risk. Stay alert to rapid changes.</p>
-          </div>
 
           <div className="card shadow-sm p-3 border-0">
             <h6 className="d-flex align-items-center gap-2 fw-bold">
