@@ -12,9 +12,7 @@ function Navbar() {
           <li className="nav-item">
             <Link className="nav-link" to="/flood">Flood Risk</Link>
           </li>
-          <li className="nav-item">
-            <Link className="nav-link" to="/wildfire">Wildfire Risk</Link>
-          </li>
+        
           <li className="nav-item">
             <Link className="nav-link" to="/precipitation">Precipitation</Link>
           </li>

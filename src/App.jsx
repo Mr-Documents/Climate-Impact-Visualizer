@@ -3,7 +3,7 @@ import Navbar from "./components/layout/navbar";
 
 import Dashboard from "./pages/dashboard";
 import FloodRisk from "./pages/floodrisk";
-import WildfireRisk from "./pages/wildfirerisk";
+
 import Precipitation from "./pages/precipitationsoil";
 
 function App() {
@@ -14,7 +14,6 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/flood" element={<FloodRisk />} />
-        <Route path="/wildfire" element={<WildfireRisk />} />
         <Route path="/precipitation" element={<Precipitation />} />
       </Routes>
     </BrowserRouter>
