@@ -1,4 +1,4 @@
-// Updated Dashboard.jsx with improved UI and restored descriptive texts
+// Dashboard.jsx - Updated with Drought Risk and live color indicators
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
@@ -36,30 +36,48 @@ const Dashboard = () => {
   const [hourLabels, setHourLabels] = useState([]);
 
   const [floodRisk, setFloodRisk] = useState("N/A");
+  const [droughtRisk, setDroughtRisk] = useState("N/A");
+
+  const getRiskColor = (risk) => {
+    switch (risk.toLowerCase()) {
+      case "high":
+        return "text-danger";
+      case "medium":
+        return "text-warning";
+      case "low":
+        return "text-success";
+      default:
+        return "text-muted";
+    }
+  };
 
   const fetchAllData = useCallback(async (lat, lon) => {
     setLoading(true);
 
     try {
-      const [rainRes, weatherRes, floodRes] = await Promise.all([
+      // Fetch rainfall, weather, and AI predictions
+      const [rainRes, weatherRes, predictionRes] = await Promise.all([
         axios.get(`http://localhost:5000/api/precipitation?lat=${lat}&lon=${lon}`),
         axios.get(`http://localhost:5000/api/weather?lat=${lat}&lon=${lon}`),
-        axios.get(`http://localhost:5000/api/floodrisk?lat=${lat}&lon=${lon}&ai=true`)
+        axios.post(`http://localhost:5000/api/predict`, { latitude: lat, longitude: lon })
       ]);
 
+      // Rainfall data
       const series = rainRes.data?.series || [];
       const hourly = series.slice(0, 24);
-
       setRainData(hourly.map(s => s.precipitation ?? 0));
       setHourLabels(hourly.map((_, i) => `${i}:00`));
 
+      // Weather data
       const weatherSeries = weatherRes.data?.series || [];
       const weatherHourly = weatherSeries.slice(0, 24);
-
       setTempData(weatherHourly.map(s => s.temperature ?? 0));
       setWindData(weatherHourly.map(s => s.windSpeed ?? 0));
 
-      setFloodRisk(floodRes.data?.floodRisk || "N/A");
+      // AI predictions
+      const predictionData = predictionRes.data?.prediction || {};
+      setFloodRisk(predictionData.flood?.label ?? "N/A");
+      setDroughtRisk(predictionData.drought?.label ?? "N/A");
 
     } catch (error) {
       console.error("Dashboard fetch error:", error);
@@ -112,26 +130,45 @@ const Dashboard = () => {
 
         <div className="col-lg-4 d-flex flex-column gap-3">
 
-
+          {/* Flood Risk */}
           <div className="card shadow-sm p-3 border-0">
             <h6 className="d-flex align-items-center gap-2 fw-bold">
               <WeatherIcon type="flood" size={28} />
               Flood Risk
             </h6>
-            <p className="fs-4 fw-bold text-primary">{floodRisk}</p>
-            <p className="text-muted small">Heavy rainfall, saturated soil, and poor drainage can contribute to urban or flash flooding. Monitor water levels closely.</p>
+            <p className={`fs-4 fw-bold ${getRiskColor(floodRisk)}`}>{floodRisk}</p>
+            <p className="text-muted small">
+              Heavy rainfall, saturated soil, and poor drainage can contribute to urban or flash flooding. Monitor water levels closely.
+            </p>
           </div>
 
+          {/* Drought Risk */}
+          <div className="card shadow-sm p-3 border-0">
+            <h6 className="d-flex align-items-center gap-2 fw-bold">
+              <WeatherIcon type="drought" size={28} />
+              Drought Risk
+            </h6>
+            <p className={`fs-4 fw-bold ${getRiskColor(droughtRisk)}`}>{droughtRisk}</p>
+            <p className="text-muted small">
+              Low precipitation, high temperatures, and reduced soil moisture increase drought potential. Plan water usage and conservation accordingly.
+            </p>
+          </div>
+
+          {/* 24-Hour Rainfall */}
           <div className="card shadow-sm p-3 border-0">
             <h6 className="d-flex align-items-center gap-2 fw-bold">
               <WeatherIcon type="rain" size={28} />
               24-Hour Rainfall Total
             </h6>
             <p className="fs-4 fw-bold">{(rainData.reduce((a, b) => a + b, 0)).toFixed(1)} mm</p>
-            <p className="text-muted small">Accumulated rainfall over the past 24 hours helps assess flood potential and short-term water availability.</p>
+            <p className="text-muted small">
+              Accumulated rainfall over the past 24 hours helps assess flood potential and short-term water availability.
+            </p>
           </div>
+
         </div>
 
+        {/* Climate Trends Chart */}
         <div className="col-12">
           <div className="card shadow-sm border-0">
             <div className="card-body">
