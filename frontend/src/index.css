@@ -1,0 +1,14 @@
+@import "bootstrap-icons/font/bootstrap-icons.css";
+
+
+
+.dark-mode {
+  background-color: #1c1c1c;
+  color: white;
+}
+
+.dark-card {
+  background-color: #2c2c2c !important;
+  color: white;
+}
+
