@@ -1,64 +1,79 @@
-import * as tf from "@tensorflow/tfjs";
-import fs from "fs";
 import path from "path";
+import fs from "fs";
+
+// Fix Windows DLL loading
+if (process.platform === 'win32') {
+  const tfDllPath = path.join(process.cwd(), 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
+  process.env.PATH = `${process.env.PATH};${tfDllPath}`;
+}
+
+// Dynamic import to apply PATH change first
+const tf = await import("@tensorflow/tfjs-node");
+
+let loadedDroughtModel = null;
+let loadedFloodModel = null;
 
 /**
- * Predicts flood and drought risk using trained climate AI model
- * @param {Object} data
- * @param {number} data.precipitation - mm
- * @param {number} data.soilMoisture - 0-1
- * @param {number} data.windSpeed - km/h
- * @param {number} data.temperature - °C
- * @param {number} data.humidity - 0-1
+ * Predicts flood and drought risk using trained LSTM models
+ * @param {number[][]} featuresSequence - array of [TIME_STEPS, numFeatures]
  */
-export async function predictClimateRisk({
-  precipitation = 0,
-  soilMoisture = 0,
-  windSpeed = 0,
-  temperature = 25,
-  humidity = 0.5
-} = {}) {
-  
-  // Normalize inputs and ensure valid numbers
-  const p = Math.max(0, Number(precipitation) || 0);
-  const s = Math.min(1, Math.max(0, Number(soilMoisture) || 0));
-  const w = Math.max(0, Number(windSpeed) || 0);
-  const t = Number(temperature) || 25;
-  const h = Math.min(1, Math.max(0, Number(humidity) || 0));
 
-  // Compute engineered features
-  const rainIndex = p * s;
-  const drynessIndex = t * (1 - h);
-  const stormIndex = p * w;
+export async function predictClimateRisk(featuresSequence) {
+  if (!Array.isArray(featuresSequence) || featuresSequence.length === 0) {
+    throw new Error("featuresSequence must be a non-empty 2D array");
+  }
 
-  // Load model from manually saved JSON
-  const modelPath = path.resolve("./climate-model/model.json");
-  const modelJSON = fs.readFileSync(modelPath, "utf-8");
-  const model = await tf.models.modelFromJSON(JSON.parse(modelJSON));
+  // Load drought and flood models once
+  if (!loadedDroughtModel || !loadedFloodModel) {
+    const droughtModelPath = path.resolve("./saved_model_drought/model.json");
+    const floodModelPath = path.resolve("./saved_model_flood/model.json");
 
-  // Prepare input tensor (1 sample, 8 features)
-  const inputTensor = tf.tensor2d([[p, s, w, t, h, rainIndex, drynessIndex, stormIndex]]);
-
-  // Predict
-  const output = model.predict(inputTensor);
-  const scores = await output.array(); // [[floodScore, droughtScore]]
-  const [floodScore, droughtScore] = scores[0];
-
-  // Convert numeric scores to labels
-  const getLabel = (score) => {
-    if (score > 0.65) return "High";
-    else if (score > 0.35) return "Medium";
-    return "Low";
-  };
-
-  return {
-    flood: {
-      score: Number(floodScore.toFixed(3)),
-      label: getLabel(floodScore)
-    },
-    drought: {
-      score: Number(droughtScore.toFixed(3)),
-      label: getLabel(droughtScore)
+    if (!fs.existsSync(droughtModelPath) || !fs.existsSync(floodModelPath)) {
+      throw new Error("Model files not found. Please run 'node trainClimateModel.js' first.");
     }
-  };
+
+    // Helper to format path for tfjs-node (avoiding %20 encoding issues)
+    const getModelUrl = (p) => {
+      let resolved = path.resolve(p);
+      if (process.platform === 'win32') resolved = resolved.replace(/\\/g, '/');
+      return `file://${resolved}`;
+    };
+
+    [loadedDroughtModel, loadedFloodModel] = await Promise.all([
+      tf.loadLayersModel(getModelUrl(droughtModelPath)),
+      tf.loadLayersModel(getModelUrl(floodModelPath))
+    ]);
+  }
+
+  // Use tf.tidy to clean up all intermediate tensors (input, output, etc.) automatically
+  const result = tf.tidy(() => {
+    // Prepare input tensor (shape: [1, TIME_STEPS, numFeatures])
+    const inputTensor = tf.tensor3d([featuresSequence]);
+
+    // Predict drought
+    const droughtOutput = loadedDroughtModel.predict(inputTensor);
+    const droughtScores = droughtOutput.arraySync(); // Use synchronous arraySync inside tidy
+    const droughtIndex = droughtScores[0].indexOf(Math.max(...droughtScores[0]));
+
+    // Predict flood
+    const floodOutput = loadedFloodModel.predict(inputTensor);
+    const floodScores = floodOutput.arraySync();
+    const floodIndex = floodScores[0].indexOf(Math.max(...floodScores[0]));
+
+    // Convert numeric index to label
+    const labels = ["Low", "Medium", "High"];
+
+    return {
+      drought: {
+        score: Number(droughtScores[0][droughtIndex].toFixed(3)),
+        label: labels[droughtIndex]
+      },
+      flood: {
+        score: Number(floodScores[0][floodIndex].toFixed(3)),
+        label: labels[floodIndex]
+      }
+    };
+  });
+
+  return result;
 }

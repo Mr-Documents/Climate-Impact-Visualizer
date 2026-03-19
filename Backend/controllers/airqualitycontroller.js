@@ -5,11 +5,11 @@ export const getAirQuality = async (req, res) => {
   const lon = req.query.lon || '-0.20';
 
   try {
-    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone`;
+    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&hourly=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone`;
     const response = await axios.get(url);
 
-    const { hourly } = response.data;
-    const series = hourly.time.map((time, i) => ({
+    const { current, hourly } = response.data;
+    const series = (hourly?.time || []).map((time, i) => ({
       time,
       pm10: hourly.pm10[i],
       pm2_5: hourly.pm2_5[i],
@@ -19,7 +19,7 @@ export const getAirQuality = async (req, res) => {
       o3: hourly.ozone[i],
     }));
 
-    res.json({ location: { lat, lon }, series });
+    res.json({ location: { lat, lon }, current, series });
   } catch (error) {
     console.error('Air quality fetch error:', error.message);
     res.status(500).json({ error: 'Failed to fetch air quality data' });

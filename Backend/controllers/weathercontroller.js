@@ -15,7 +15,7 @@ export const getWeatherData = async (req, res) => {
   try {
     // Open-Meteo does not support `soil_moisture_0_7cm` (causes 400 errors).
     // Use the supported 0-1cm soil moisture field instead.
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${safeLat}&longitude=${safeLon}&hourly=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,cloudcover,soil_moisture_0_1cm,soil_temperature_0cm`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${safeLat}&longitude=${safeLon}&hourly=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,cloudcover,soil_moisture_0_1cm,soil_temperature_0cm&past_days=1&forecast_days=2`;
     const response = await axios.get(url);
 
     const { hourly } = response.data;

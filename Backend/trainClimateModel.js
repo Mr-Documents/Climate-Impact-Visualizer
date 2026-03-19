@@ -1,98 +1,229 @@
-import * as tf from "@tensorflow/tfjs";
-import fs from "fs";
+import path from 'path';
+import fs from 'fs';
+import csv from 'csv-parser';
+import { fileURLToPath } from 'url';
 
-/*
- Climate Model Training Script
- Predicts:
-   1. Flood Risk
-   2. Drought Risk
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
- Inputs:
- precipitation
- soilMoisture
- windSpeed
- temperature
- humidity
-
- Engineered Features:
- rainIndex
- drynessIndex
- stormIndex
-*/
-
-function createFeatures(data) {
-  const rainIndex = data.precipitation * data.soilMoisture;
-  const drynessIndex = data.temperature * (1 - data.humidity);
-  const stormIndex = data.precipitation * data.windSpeed;
-
-  return [
-    data.precipitation,
-    data.soilMoisture,
-    data.windSpeed,
-    data.temperature,
-    data.humidity,
-    rainIndex,
-    drynessIndex,
-    stormIndex
-  ];
+// --- 0. FIX TENSORFLOW NATIVE LOADING ON WINDOWS ---
+// This fixes ERR_DLOPEN_FAILED by adding the DLL path to the system PATH before loading
+const tfDllPath = path.join(process.cwd(), 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
+if (process.platform === 'win32') {
+  process.env.PATH = `${process.env.PATH};${tfDllPath}`;
 }
 
-async function trainModel() {
+let tf;
+try {
+  // Load dynamically to ensure PATH is updated first
+  tf = await import('@tensorflow/tfjs-node');
+} catch (err) {
+  console.error("\n[CRITICAL ERROR] Could not load Native TensorFlow.");
+  console.error("Try moving your project folder to a shorter path (e.g. C:\\ClimateViz) to avoid OneDrive/Windows path limits.");
+  throw err;
+}
 
-  // Example training dataset
-  const rawData = [
-    { precipitation: 30, soilMoisture: 0.9, windSpeed: 12, temperature: 27, humidity: 0.85, flood: 0.9, drought: 0.1 },
-    { precipitation: 2, soilMoisture: 0.1, windSpeed: 4, temperature: 40, humidity: 0.2, flood: 0.05, drought: 0.95 },
-    { precipitation: 10, soilMoisture: 0.4, windSpeed: 6, temperature: 32, humidity: 0.5, flood: 0.3, drought: 0.5 },
-    { precipitation: 35, soilMoisture: 0.95, windSpeed: 15, temperature: 26, humidity: 0.9, flood: 0.95, drought: 0.05 },
-    { precipitation: 5, soilMoisture: 0.2, windSpeed: 5, temperature: 38, humidity: 0.3, flood: 0.1, drought: 0.85 },
-    { precipitation: 18, soilMoisture: 0.6, windSpeed: 8, temperature: 30, humidity: 0.6, flood: 0.6, drought: 0.3 }
+// --- 1. DATASET CONFIGURATION ---
+const DATASET_PATH = path.join(__dirname, 'data', 'dataset-10yrs.csv');
+
+// Features for both flood & drought prediction
+const RAW_FEATURE_COLUMNS = [
+  'Temperature',
+  'Relative Humidity',
+  'Soil Moisture',
+  'Wind Speed',
+  'Wind Direction',
+  'Vapor Pressure Deficit',
+  'Precipitation Total' // needed only for flood risk label generation
+];
+
+// Label columns
+const DROUGHT_LABEL = 'drought_risk';
+const FLOOD_LABEL = 'flood_risk'; // will be generated automatically
+
+// --- 2. MODEL HYPERPARAMETERS ---
+const LEARNING_RATE = 0.001;
+const EPOCHS = 50;
+const BATCH_SIZE = 32;
+const TIME_STEPS = 24; // look-back 24 hours
+const TRAIN_SPLIT = 0.8;
+
+// --- 3. HELPER FUNCTIONS ---
+function processRow(row) {
+  // Parse numeric features
+  const temp = parseFloat(row['Basel Temperature [2 m elevation corrected]']);
+  const humidity = parseFloat(row['Basel Relative Humidity [2 m]']);
+  const soil = parseFloat(row['Basel Soil Moisture [0-7 cm down]']);
+  const windSpeed = parseFloat(row['Basel Wind Speed [10 m]']);
+  const windDir = parseFloat(row['Basel Wind Direction [10 m]']);
+  const vpd = parseFloat(row['Basel Vapor Pressure Deficit [2 m]']);
+  const precip = parseFloat(row['Basel Precipitation Total']);
+
+  // Timestamp features
+  const ts = row.timestamp || row['\ufefftimestamp']; // Handle potential BOM
+  if (!ts) return null;
+  const date = new Date(ts.slice(0,4)+'-'+ts.slice(4,6)+'-'+ts.slice(6,8)+'T'+ts.slice(9,11)+':00:00Z');
+  const hour = date.getUTCHours();
+  const month = date.getUTCMonth() + 1;
+
+  // Check for parsing errors
+  const parsedFeatures = [temp, humidity, soil, windSpeed, windDir, vpd, precip, hour, month];
+  if (parsedFeatures.some(isNaN)) {
+    // console.warn('Skipping row with invalid data:', row);
+    return null;
+  }
+
+  // Encode wind direction
+  const sinWind = Math.sin(windDir * Math.PI / 180);
+  const cosWind = Math.cos(windDir * Math.PI / 180);
+
+  const features = [
+    temp, humidity, soil, windSpeed, vpd, sinWind, cosWind, hour, month
   ];
 
-  const inputs = rawData.map(createFeatures);
-  const outputs = rawData.map(d => [d.flood, d.drought]);
+  // Drought label generation (0: low, 1: medium, 2: high)
+  let droughtLabel = 0;
+  if (soil < 0.15 && vpd > 2.0) droughtLabel = 2; // High risk
+  else if (soil < 0.25 && vpd > 1.0) droughtLabel = 1; // Medium risk
 
-  const xs = tf.tensor2d(inputs);
-  const ys = tf.tensor2d(outputs);
 
+  // Flood label generation
+  let floodLabel = 0; // low
+  if (precip >= 50 || soil >= 0.5) floodLabel = 2; // high
+  else if (precip >= 20 || soil >= 0.35) floodLabel = 1; // medium
+
+  return { features, droughtLabel, floodLabel };
+}
+
+// Normalize data
+function normalizeTensor(tensor) {
+  const mean = tensor.mean(0);
+  const std = tensor.sub(mean).square().mean(0).sqrt();
+  const normalized = tensor.sub(mean).div(std.add(1e-6));
+  return { normalized, mean, std };
+}
+
+// Create sequences for LSTM
+function createSequences(featuresTensor, labelsTensor, timeSteps) {
+  const xs = [];
+  const ys = [];
+  for (let i = 0; i < featuresTensor.shape[0] - timeSteps; i++) {
+    xs.push(featuresTensor.slice([i, 0], [timeSteps, featuresTensor.shape[1]]));
+    ys.push(labelsTensor.slice([i + timeSteps], [1]));
+  }
+  return {
+    xs: tf.stack(xs), // [samples, timeSteps, numFeatures]
+    ys: tf.oneHot(tf.concat(ys).cast('int32'), 3) // 3 classes
+  };
+}
+
+// --- 4. LOAD DATA ---
+async function loadDataset() {
+  const rawData = [];
+  let headers = [];
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(DATASET_PATH)
+      .pipe(csv())
+      .on('headers', (h) => headers = h)
+      .on('data', row => {
+        const processed = processRow(row);
+        if (processed) rawData.push(processed);
+      })
+      .on('end', () => {
+        if (rawData.length === 0) {
+          console.error("\n[ERROR] No valid data rows found.");
+          console.error("Detected CSV Headers:", headers);
+          return reject(new Error("Dataset empty or 'timestamp' column missing/mismatched. Check case sensitivity."));
+        }
+
+        const featuresArray = rawData.map(r => r.features);
+        const droughtLabelsArray = rawData.map(r => r.droughtLabel);
+        const floodLabelsArray = rawData.map(r => r.floodLabel);
+
+        const featuresTensor = tf.tensor2d(featuresArray);
+        const droughtLabelsTensor = tf.tensor1d(droughtLabelsArray, 'int32');
+        const floodLabelsTensor = tf.tensor1d(floodLabelsArray, 'int32');
+
+        resolve({ featuresTensor, droughtLabelsTensor, floodLabelsTensor });
+      })
+      .on('error', reject);
+  });
+}
+
+// --- 5. CREATE LSTM MODEL ---
+function createLSTMModel(numFeatures) {
   const model = tf.sequential();
-
-  model.add(tf.layers.dense({
-    units: 16,
-    activation: "relu",
-    inputShape: [8]
+  model.add(tf.layers.lstm({
+    units: 64,
+    inputShape: [TIME_STEPS, numFeatures],
+    returnSequences: false
   }));
-
-  model.add(tf.layers.dense({
-    units: 8,
-    activation: "relu"
-  }));
-
-  model.add(tf.layers.dense({
-    units: 2,
-    activation: "sigmoid"
-  }));
-
+  model.add(tf.layers.dropout({ rate: 0.3 }));
+  model.add(tf.layers.dense({ units: 32, activation: 'relu' }));
+  model.add(tf.layers.dense({ units: 3, activation: 'softmax' })); // 3 classes
   model.compile({
-    optimizer: tf.train.adam(0.01),
-    loss: "meanSquaredError"
+    optimizer: tf.train.adam(LEARNING_RATE),
+    loss: 'categoricalCrossentropy',
+    metrics: ['accuracy']
   });
-
-  console.log("Training model...");
-
-  await model.fit(xs, ys, {
-    epochs: 300,
-    shuffle: true
-  });
-
-  // Save manually in pure JS TensorFlow
-  const savePath = "./climate-model";
-  if (!fs.existsSync(savePath)) fs.mkdirSync(savePath);
-
-  const modelJSON = await model.toJSON(null, false);
-  fs.writeFileSync(`${savePath}/model.json`, JSON.stringify(modelJSON, null, 2)); // <-- FIXED
-
-  console.log("Model trained and saved to ./climate-model/model.json");
+  return model;
 }
 
-trainModel();
+// Custom save handler for pure tfjs in Node
+async function saveModelToDisk(model, dirPath) {
+  // tfjs-node expects a 'file://' prefix.
+  // We manually construct this to avoid pathToFileURL encoding spaces as %20,
+  // which causes "EINVAL: invalid argument, mkdir" errors in tfjs-node on Windows.
+  let absolutePath = path.resolve(dirPath);
+  if (process.platform === 'win32') {
+    absolutePath = absolutePath.replace(/\\/g, '/');
+  }
+  const saveUrl = `file://${absolutePath}`;
+  await model.save(saveUrl);
+}
+
+// --- 6. TRAIN FUNCTION ---
+async function trainModel(featuresTensor, labelsTensor, modelName) {
+  const { normalized: featuresNorm } = normalizeTensor(featuresTensor);
+  const { xs, ys } = createSequences(featuresNorm, labelsTensor, TIME_STEPS);
+
+  // Train/Validation split
+  const splitIndex = Math.floor(xs.shape[0] * TRAIN_SPLIT);
+  const xTrain = xs.slice([0,0,0], [splitIndex, TIME_STEPS, xs.shape[2]]);
+  const yTrain = ys.slice([0,0], [splitIndex, ys.shape[1]]);
+  const xVal = xs.slice([splitIndex,0,0], [xs.shape[0]-splitIndex, TIME_STEPS, xs.shape[2]]);
+  const yVal = ys.slice([splitIndex,0], [ys.shape[0]-splitIndex, ys.shape[1]]);
+
+  const model = createLSTMModel(xs.shape[2]);
+
+  console.log(`\nTraining ${modelName} model...`);
+  await model.fit(xTrain, yTrain, {
+    epochs: EPOCHS,
+    batchSize: BATCH_SIZE,
+    validationData: [xVal, yVal],
+    callbacks: {
+      onEpochEnd: (epoch, logs) => {
+        console.log(`[${modelName}] Epoch ${epoch+1}/${EPOCHS} - loss: ${logs.loss.toFixed(4)} - acc: ${logs.acc.toFixed(4)} - val_loss: ${logs.val_loss.toFixed(4)} - val_acc: ${logs.val_acc.toFixed(4)}`);
+      }
+    }
+  });
+
+  const savePath = path.join(__dirname, `saved_model_${modelName}`);
+  await saveModelToDisk(model, savePath);
+  console.log(`${modelName} model saved at: ${savePath}`);
+}
+
+// --- 7. RUN ---
+async function main() {
+  try {
+    console.log('Loading dataset...');
+    const { featuresTensor, droughtLabelsTensor, floodLabelsTensor } = await loadDataset();
+
+    await trainModel(featuresTensor, droughtLabelsTensor, 'drought');
+    await trainModel(featuresTensor, floodLabelsTensor, 'flood');
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+main();

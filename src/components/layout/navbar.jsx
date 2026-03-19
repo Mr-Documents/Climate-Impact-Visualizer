@@ -1,6 +1,4 @@
 import { Link } from "react-router-dom";
-import DarkModeToggle from "./darklightmode";
-
 
 function Navbar() {
   return (
@@ -20,7 +18,6 @@ function Navbar() {
         </ul>
         
       </div>
-      <DarkModeToggle />
 
     </nav>
   );

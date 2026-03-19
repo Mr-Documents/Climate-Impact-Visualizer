@@ -4,22 +4,45 @@ import UnifiedMap from "../components/map/mapview";
 import WeatherIcon from "../components/ui/weathericon";
 import axios from "axios";
 import ResultCard from "../components/reusable/resultcard";
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const FloodRiskPage = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [data, setData] = useState(null);
 
   const handleAnalyze = async (lat, lon) => {
     setCoords({ lat, lon });
     setLoading(true);
-    setResult(null);
+    setData(null);
 
     try {
-      const response = await axios.get(
-        `http://localhost:5000/api/floodrisk?lat=${lat}&lon=${lon}&ai=true`
-      );
-      setResult(response.data);
+      // Using the trained model endpoint
+      const response = await axios.post("http://localhost:5000/api/predict", {
+        latitude: lat,
+        longitude: lon,
+      });
+      setData(response.data);
     } catch (err) {
       console.error(err);
       alert("Failed to analyze flood risk");
@@ -28,59 +51,127 @@ const FloodRiskPage = () => {
     }
   };
 
+  const floodPrediction = data?.prediction?.flood;
+  const weather = data?.weather;
+  const history = data?.history;
+
+  const chartData = history ? {
+    labels: history.time,
+    datasets: [
+      {
+        label: 'Precipitation (mm)',
+        data: history.precipitation,
+        borderColor: 'rgb(53, 162, 235)',
+        backgroundColor: 'rgba(53, 162, 235, 0.5)',
+        yAxisID: 'y',
+      },
+      {
+        label: 'Soil Moisture (m³/m³)',
+        data: history.soilMoisture,
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+        yAxisID: 'y1',
+      },
+    ],
+  } : null;
+
+  const chartOptions = {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Precipitation (mm)' } },
+      y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Soil Moisture' } },
+    },
+  };
+
+  const getRiskColor = (label) => {
+    if (label === 'High') return 'danger';
+    if (label === 'Medium') return 'warning';
+    return 'success';
+  };
+
   return (
     <div className="container py-4">
-
       <h2 className="mb-3 d-flex align-items-center gap-2">
         <WeatherIcon type="flood" size={35} />
-        Flood Risk Analysis
+        Flood Risk Analysis (AI Model)
       </h2>
 
-      {/* Coordinates Form — Now identical to PrecipitationPage */}
-      <CoordinateForm
-        onSubmit={handleAnalyze}
-        loading={loading}
-        buttonText="Analyze Flood Risk"
-        buttonColor="primary"
-      />
-
-      {/* Loading Spinner */}
-      {loading && (
-        <div className="text-center my-4">
-          <div className="spinner-border text-primary" role="status"></div>
-          <p className="mt-2">Analyzing flood risk...</p>
+      <div className="row">
+        <div className="col-md-4">
+          <CoordinateForm
+            onSubmit={handleAnalyze}
+            loading={loading}
+            buttonText="Analyze Flood Risk"
+            buttonColor="primary"
+          />
+          <div className="mt-3">
+            <UnifiedMap
+              lat={coords.lat}
+              lon={coords.lon}
+              onSelect={(lat, lon) => setCoords({ lat, lon })}
+            />
+          </div>
         </div>
-      )}
 
-      {/* Map — now clickable like precipitation page */}
-      <UnifiedMap
-        lat={coords.lat}
-        lon={coords.lon}
-        onSelect={(lat, lon) => setCoords({ lat, lon })}
-      />
+        <div className="col-md-8">
+          {loading && (
+            <div className="text-center my-5">
+              <div className="spinner-border text-primary" role="status"></div>
+              <p className="mt-2">Running AI Prediction Model...</p>
+            </div>
+          )}
 
-      {/* Results */}
-      {result && (
-        <ResultCard
-          title="Flood Risk Analysis"
-          icon={<WeatherIcon type="flood" size={28} />}
-          color={
-            result.risk === "High"
-              ? "danger"
-              : result.risk === "Medium"
-              ? "warning"
-              : "success"
-          }
-        >
-          <p><strong>AI Predicted Risk:</strong> {result.risk}</p>
-          <p><strong>Rainfall:</strong> {result.rainfall} mm</p>
-          <p><strong>Soil Moisture:</strong> {result.soilMoisture} %</p>
-          <p><strong>Humidity:</strong> {result.humidity} %</p>
-          <p><strong>Notes:</strong> {result.message}</p>
-          <p><strong>Coordinates:</strong> {coords.lat}, {coords.lon}</p>
-        </ResultCard>
-      )}
+          {!loading && data && floodPrediction && (
+            <div className="d-flex flex-column gap-3">
+              <ResultCard
+                title="Prediction Result"
+                icon={<WeatherIcon type="flood" size={28} />}
+                color={getRiskColor(floodPrediction.label)}
+              >
+                <div className="row text-center">
+                  <div className="col-6">
+                    <h3 className={`text-${getRiskColor(floodPrediction.label)}`}>{floodPrediction.label}</h3>
+                    <small className="text-muted">Risk Level</small>
+                  </div>
+                  <div className="col-6">
+                    <h3>{(floodPrediction.score * 100).toFixed(1)}%</h3>
+                    <small className="text-muted">Confidence Score</small>
+                  </div>
+                </div>
+                <hr />
+                <div className="row mt-3">
+                  <div className="col-4">
+                    <strong>Precipitation</strong><br />
+                    {weather.precipitation} mm
+                  </div>
+                  <div className="col-4">
+                    <strong>Soil Moisture</strong><br />
+                    {weather.soilMoisture} m³/m³
+                  </div>
+                  <div className="col-4">
+                    <strong>Wind Speed</strong><br />
+                    {weather.windSpeed} km/h
+                  </div>
+                </div>
+              </ResultCard>
 
+              {chartData && (
+                <div className="card shadow-sm p-3">
+                  <h5>24-Hour Environmental Trend</h5>
+                  <Line options={chartOptions} data={chartData} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {!loading && !data && (
+            <div className="alert alert-light text-center mt-4">
+              Select a location and click "Analyze" to see AI analysis.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

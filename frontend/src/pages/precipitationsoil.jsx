@@ -48,10 +48,10 @@ const PrecipitationPage = () => {
         buttonColor="success"
       />
 
-      {/* Loading Spinner (same style as FloodRiskPage) */}
+      {/* Loading Spinner */}
       {loading && (
         <div className="text-center my-4">
-          <div className="spinner-border text-success" role="status"></div>
+          <LoadingSpinner />
           <p className="mt-2">Fetching precipitation forecast...</p>
         </div>
       )}
@@ -70,10 +70,22 @@ const PrecipitationPage = () => {
           icon={<FaCloudRain size={28} />}
           color="success"
         >
-          <p><strong>Coordinates:</strong> {coords.lat}, {coords.lon}</p>
+          <p>
+            <strong>Coordinates:</strong> {coords.lat}, {coords.lon}
+          </p>
 
-          {/* Chart using forecast.series */}
-          <RainfallChart data={forecast.series} />
+          <p className="mb-2 text-muted">
+            Showing the next 24 hours of precipitation based on Open-Meteo forecast data.
+          </p>
+
+          {/* Chart using hourly precipitation array */}
+          <RainfallChart data={forecast.hourly?.precipitation ?? []} />
+
+          {forecast.series && forecast.series.length > 0 && (
+            <p className="mt-3 mb-0 text-muted small">
+              {`Next hour forecast: ${forecast.series[0].precipitation ?? 0} mm`}
+            </p>
+          )}
         </ResultCard>
       )}
 

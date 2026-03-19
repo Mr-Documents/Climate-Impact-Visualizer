@@ -1,5 +1,3 @@
-import { FaFire, FaWater, FaCloudRain } from "react-icons/fa";
-
 function ResultCard({ title, icon, color, children }) {
   return (
     <div className={`card border-${color} mt-4 shadow-sm`}>
