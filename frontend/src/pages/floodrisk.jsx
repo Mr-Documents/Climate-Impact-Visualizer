@@ -5,6 +5,7 @@ import WeatherIcon from "../components/ui/weathericon";
 import axios from "axios";
 import ResultCard from "../components/reusable/resultcard";
 import { Line } from 'react-chartjs-2';
+import { FaInfoCircle } from "react-icons/fa";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -90,6 +91,12 @@ const FloodRiskPage = () => {
     return 'success';
   };
 
+  const getInsight = (label) => {
+    if (label === 'High') return "Critical levels of soil moisture and precipitation detected. The AI model indicates a significant probability of runoff and flash flooding. Avoid low-lying areas.";
+    if (label === 'Medium') return "Moderate risk conditions observed. Soil saturation is increasing; continued rainfall may lead to localized waterlogging.";
+    return "Environmental conditions are stable. Current precipitation and soil saturation levels are within safe limits, posing no immediate flood threat.";
+  };
+
   return (
     <div className="container py-4">
       <h2 className="mb-3 d-flex align-items-center gap-2">
@@ -162,6 +169,14 @@ const FloodRiskPage = () => {
                   <Line options={chartOptions} data={chartData} />
                 </div>
               )}
+
+              <div className={`alert ${floodPrediction.label === 'High' ? 'alert-danger' : floodPrediction.label === 'Medium' ? 'alert-warning' : 'alert-success'} shadow-sm border-0 d-flex gap-3 align-items-start`}>
+                <FaInfoCircle className="mt-1 flex-shrink-0" size={20} />
+                <div>
+                  <h5 className="alert-heading fw-bold h6">AI Prediction Insight</h5>
+                  <p className="mb-0 small">{getInsight(floodPrediction.label)}</p>
+                </div>
+              </div>
             </div>
           )}
 

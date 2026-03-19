@@ -5,6 +5,7 @@ import WeatherIcon from "../components/ui/weathericon";
 import axios from "axios";
 import ResultCard from "../components/reusable/resultcard";
 import { Line } from 'react-chartjs-2';
+import { FaInfoCircle } from "react-icons/fa";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -89,6 +90,12 @@ const DroughtRiskPage = () => {
     return 'success';
   };
 
+  const getInsight = (label) => {
+    if (label === 'High') return "Severe moisture deficit detected. High temperatures combined with critically low soil moisture suggest vegetation stress and water scarcity risks.";
+    if (label === 'Medium') return "Developing dry conditions. Soil moisture levels are declining relative to the current temperature. Monitor local water resources.";
+    return "Hydrological conditions are healthy. Soil moisture and humidity levels are sufficient to sustain typical vegetation.";
+  };
+
   return (
     <div className="container py-4">
       <h2 className="mb-3 d-flex align-items-center gap-2">
@@ -161,6 +168,14 @@ const DroughtRiskPage = () => {
                   <Line options={chartOptions} data={chartData} />
                 </div>
               )}
+
+              <div className={`alert ${droughtPrediction.label === 'High' ? 'alert-danger' : droughtPrediction.label === 'Medium' ? 'alert-warning' : 'alert-success'} shadow-sm border-0 d-flex gap-3 align-items-start`}>
+                <FaInfoCircle className="mt-1 flex-shrink-0" size={20} />
+                <div>
+                  <h5 className="alert-heading fw-bold h6">AI Prediction Insight</h5>
+                  <p className="mb-0 small">{getInsight(droughtPrediction.label)}</p>
+                </div>
+              </div>
             </div>
           )}
 
