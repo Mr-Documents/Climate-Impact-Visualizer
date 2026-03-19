@@ -4,6 +4,27 @@ import UnifiedMap from "../components/map/mapview";
 import WeatherIcon from "../components/ui/weathericon";
 import axios from "axios";
 import ResultCard from "../components/reusable/resultcard";
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const DroughtRiskPage = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
@@ -22,121 +43,136 @@ const DroughtRiskPage = () => {
       });
       setData(res.data);
     } catch (err) {
-      console.error("Drought prediction error:", err);
-      alert("Failed to retrieve drought prediction.");
+      console.error(err);
+      alert("Failed to analyze drought risk");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ FIXED: use "data" instead of undefined "prediction"
-  const droughtRisk = data?.prediction?.drought;
+  const droughtPrediction = data?.prediction?.drought;
   const weather = data?.weather;
+  const history = data?.history;
 
-  const getRiskColor = (riskLabel) => {
-    const r = (riskLabel || "").toLowerCase();
-    if (r === "high") return "danger";
-    if (r === "medium") return "warning";
-    if (r === "low") return "success";
-    return "secondary";
+  const chartData = history ? {
+    labels: history.time,
+    datasets: [
+      {
+        label: 'Temperature (°C)',
+        data: history.temperature,
+        borderColor: 'rgb(255, 159, 64)',
+        backgroundColor: 'rgba(255, 159, 64, 0.5)',
+        yAxisID: 'y',
+      },
+      {
+        label: 'Soil Moisture (m³/m³)',
+        data: history.soilMoisture,
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+        yAxisID: 'y1',
+      },
+    ],
+  } : null;
+
+  const chartOptions = {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Temperature (°C)' } },
+      y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Soil Moisture' } },
+    },
   };
 
-  const humidityPct =
-    weather?.humidity != null
-      ? Math.round(weather.humidity * 100)
-      : null;
-
-  const soilMoisturePct =
-    weather?.soilMoisture != null
-      ? Math.round((weather.soilMoisture || 0) * 100)
-      : null;
-
-  const drynessIndex = weather
-    ? Number((weather.temperature * (1 - (weather.humidity ?? 0))).toFixed(1))
-    : null;
+  const getRiskColor = (label) => {
+    if (label === 'High') return 'danger';
+    if (label === 'Medium') return 'warning';
+    return 'success';
+  };
 
   return (
     <div className="container py-4">
       <h2 className="mb-3 d-flex align-items-center gap-2">
         <WeatherIcon type="drought" size={35} />
-        Drought Severity Prediction
+        Drought Risk Analysis (AI Model)
       </h2>
 
-      <p className="text-muted mb-3">
-        Use AI-powered predictions to estimate drought severity based on recent
-        weather, soil moisture, and temperature data.
-      </p>
-
-      <CoordinateForm
-        onSubmit={handleAnalyze}
-        loading={loading}
-        buttonText="Analyze Drought Risk"
-        buttonColor="warning"
-      />
-
-      {loading && (
-        <div className="text-center my-4">
-          <div className="spinner-border text-warning" role="status" />
-          <p className="mt-2">Calculating drought severity...</p>
+      <div className="row">
+        <div className="col-md-4">
+          <CoordinateForm
+            onSubmit={handleAnalyze}
+            loading={loading}
+            buttonText="Analyze Drought Risk"
+            buttonColor="warning"
+          />
+          <div className="mt-3">
+            <UnifiedMap
+              lat={coords.lat}
+              lon={coords.lon}
+              onSelect={(lat, lon) => setCoords({ lat, lon })}
+            />
+          </div>
         </div>
-      )}
 
-      <UnifiedMap
-        lat={coords.lat}
-        lon={coords.lon}
-        onSelect={(lat, lon) => setCoords({ lat, lon })}
-      />
-
-      {/* ✅ FIXED: safe rendering */}
-      {data?.prediction?.drought && (
-        <ResultCard
-          title="Drought Risk Prediction"
-          icon={<WeatherIcon type="drought" size={28} />}
-          color={getRiskColor(droughtRisk.label)}
-        >
-          <p>
-            <strong>AI Predicted Severity:</strong>{" "}
-            {droughtRisk.label} (
-            {((droughtRisk.score ?? 0) * 100).toFixed(1)}%)
-          </p>
-
-          {weather && (
-            <>
-              <p>
-                <strong>Temperature:</strong> {weather.temperature}°C
-              </p>
-              <p>
-                <strong>Humidity:</strong>{" "}
-                {humidityPct != null ? `${humidityPct}%` : "N/A"}
-              </p>
-              <p>
-                <strong>Soil Moisture:</strong>{" "}
-                {soilMoisturePct != null ? `${soilMoisturePct}%` : "N/A"}
-              </p>
-              <p>
-                <strong>Precipitation:</strong>{" "}
-                {weather.precipitation ?? "N/A"} mm
-              </p>
-              <p>
-                <strong>Dryness Index:</strong>{" "}
-                {drynessIndex != null ? drynessIndex : "N/A"}
-              </p>
-            </>
+        <div className="col-md-8">
+          {loading && (
+            <div className="text-center my-5">
+              <div className="spinner-border text-warning" role="status"></div>
+              <p className="mt-2">Running AI Prediction Model...</p>
+            </div>
           )}
 
-          <p>
-            <strong>Coordinates:</strong> {coords.lat}, {coords.lon}
-          </p>
+          {!loading && data && droughtPrediction && (
+            <div className="d-flex flex-column gap-3">
+              <ResultCard
+                title="Prediction Result"
+                icon={<WeatherIcon type="drought" size={28} />}
+                color={getRiskColor(droughtPrediction.label)}
+              >
+                <div className="row text-center">
+                  <div className="col-6">
+                    <h3 className={`text-${getRiskColor(droughtPrediction.label)}`}>{droughtPrediction.label}</h3>
+                    <small className="text-muted">Risk Level</small>
+                  </div>
+                  <div className="col-6">
+                    <h3>{(droughtPrediction.score * 100).toFixed(1)}%</h3>
+                    <small className="text-muted">Confidence Score</small>
+                  </div>
+                </div>
+                <hr />
+                <div className="row mt-3">
+                  <div className="col-4">
+                    <strong>Temperature</strong><br />
+                    {weather.temperature} °C
+                  </div>
+                  <div className="col-4">
+                    <strong>Humidity</strong><br />
+                    {weather.humidity != null ? `${weather.humidity.toFixed(0)}%` : '--'}
+                  </div>
+                  <div className="col-4">
+                    <strong>Soil Moisture</strong><br />
+                    {weather.soilMoisture} m³/m³
+                  </div>
+                </div>
+              </ResultCard>
 
-          <p className="text-muted small mb-0">
-            Tip: Higher dryness index values, low humidity, and low soil
-            moisture indicate a stronger drought signal.
-          </p>
-        </ResultCard>
-      )}
+              {chartData && (
+                <div className="card shadow-sm p-3">
+                  <h5>24-Hour Environmental Trend</h5>
+                  <Line options={chartOptions} data={chartData} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {!loading && !data && (
+            <div className="alert alert-light text-center mt-4">
+              Select a location and click "Analyze" to see AI analysis.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
 
 export default DroughtRiskPage;
-

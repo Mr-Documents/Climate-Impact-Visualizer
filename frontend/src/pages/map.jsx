@@ -248,8 +248,8 @@ const MapPage = () => {
         {/* Right Column: High Level Metrics */}
         <div className="col-lg-4 d-flex flex-column gap-3">
           <ResultCard title="Atmospheric Conditions" icon={<FaTemperatureHigh />} color="danger">
-            <div className="d-flex justify-content-between mb-2"><span>Temperature:</span> <span className="fw-bold">{current.temp ?? '--'} °C</span></div>
-            <div className="d-flex justify-content-between mb-2"><span>Humidity:</span> <span className="fw-bold">{current.humidity ? `${current.humidity.toFixed(0)}%` : '--'}</span></div>
+            <div className="d-flex justify-content-between mb-2"><span>Temperature:</span> <span className="fw-bold">{current.temp != null ? `${current.temp.toFixed(1)}°C` : '--'}</span></div>
+            <div className="d-flex justify-content-between mb-2"><span>Humidity:</span> <span className="fw-bold">{current.humidity != null ? `${current.humidity.toFixed(0)}%` : '--'}</span></div>
             <div className="d-flex justify-content-between mb-2"><span>Precipitation:</span> <span className="fw-bold">{current.precipitation ?? '--'} mm</span></div>
             <div className="d-flex justify-content-between mb-2"><span>Wind Speed:</span> <span className="fw-bold">{current.windSpeed ?? '--'} km/h</span></div>
             <div className="d-flex justify-content-between mb-2"><span>Wind Direction:</span> <span className="fw-bold">{current.windDirection ?? '--'}°</span></div>
