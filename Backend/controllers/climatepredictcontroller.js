@@ -25,7 +25,12 @@ export async function predictClimate(req, res) {
     const precipitation = current.precipitation || 0;
     const windSpeed = current.wind_speed_10m || 0;
     const temperature = current.temperature_2m || 25;
-    const soilMoisture = current.soil_moisture_0_1cm || 0.2;
+    
+    // Check for water body (Open-Meteo returns null for soil moisture over water)
+    let soilMoisture = current.soil_moisture_0_1cm;
+    const isWater = soilMoisture === null || soilMoisture === undefined;
+    if (isWater) soilMoisture = 0; // Default for calculation safety, but prediction will be skipped
+
     const humidity = current.relative_humidity_2m || 60;
 
     // For LSTM, we need a sequence; here we create a simple 24-hour sequence using same values repeated
@@ -103,13 +108,18 @@ export async function predictClimate(req, res) {
     }
 
     // Call the updated prediction function (flood + drought)
-    const prediction = await predictClimateRisk(featuresSequence);
+    let prediction = { drought: { score: 0, label: 'N/A' }, flood: { score: 0, label: 'N/A' } };
+    
+    if (!isWater) {
+      prediction = await predictClimateRisk(featuresSequence);
+    }
 
     res.json({
       location: { latitude, longitude },
-      weather: { precipitation, soilMoisture, windSpeed, temperature, humidity },
+      weather: { precipitation, soilMoisture: isWater ? null : soilMoisture, windSpeed, temperature, humidity },
       history: historyData,
-      prediction // contains { drought: { score, label }, flood: { score, label } }
+      prediction, // contains { drought: { score, label }, flood: { score, label } }
+      isWater // Flag to alert frontend
     });
 
   } catch (err) {

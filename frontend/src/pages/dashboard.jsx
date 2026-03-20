@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
+import CoordinateForm from "../components/forms/coordinateform";
 import { Line } from "react-chartjs-2";
 import { Circle } from "react-leaflet";
 import {
@@ -40,6 +41,7 @@ ChartJS.register(
 // ----- Helpers -----
 const humanizeRisk = (label) => {
   if (!label) return "N/A";
+  if (label === "--") return "--";
   const normalized = label.toString().toLowerCase();
   if (normalized === "high") return "High";
   if (normalized === "medium") return "Medium";
@@ -48,6 +50,7 @@ const humanizeRisk = (label) => {
 };
 
 const riskToPercent = (label) => {
+  if (label === "--") return 0;
   const normalized = label?.toString().toLowerCase?.();
   if (normalized === "high") return 0.85;
   if (normalized === "medium") return 0.55;
@@ -179,6 +182,8 @@ const Dashboard = () => {
   const [droughtScore, setDroughtScore] = useState(0);
 
   const [alerts, setAlerts] = useState([]);
+  const [validationError, setValidationError] = useState(null);
+  const [locationError, setLocationError] = useState(null);
   const [mapLayers, setMapLayers] = useState({
     floodRisk: true,
     drought: false,
@@ -268,6 +273,20 @@ const Dashboard = () => {
     []
   );
 
+  // Handle manual coordinate submission with validation
+  const handleManualCoordinates = (latStr, lonStr) => {
+    const lat = parseFloat(latStr);
+    const lon = parseFloat(lonStr);
+
+    if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      setValidationError("Invalid coordinates. Latitude must be between -90 and 90, Longitude between -180 and 180.");
+      return;
+    }
+    
+    setValidationError(null);
+    setCoords({ lat, lon });
+  };
+
   const fetchAllData = useCallback(
     async (lat, lon) => {
       setLoading(true);
@@ -329,11 +348,23 @@ const Dashboard = () => {
         setCurrentWeather(nextWeatherSummary);
 
         // --- AI predictions ---
+        const isWater = predictionRes.data?.isWater || false;
         const predictionData = predictionRes.data?.prediction || {};
-        const floodLabel = predictionData.flood?.label ?? "N/A";
-        const droughtLabel = predictionData.drought?.label ?? "N/A";
-        const floodSc = predictionData.flood?.score ?? 0;
-        const droughtSc = predictionData.drought?.score ?? 0;
+        
+        let floodLabel = predictionData.flood?.label ?? "N/A";
+        let droughtLabel = predictionData.drought?.label ?? "N/A";
+        let floodSc = predictionData.flood?.score ?? 0;
+        let droughtSc = predictionData.drought?.score ?? 0;
+
+        if (isWater) {
+          setLocationError("Selected location appears to be a water body or ice area. Soil-based predictions are invalid/unavailable.");
+          floodLabel = "--";
+          droughtLabel = "--";
+          floodSc = 0;
+          droughtSc = 0;
+        } else {
+          setLocationError(null);
+        }
 
         setFloodRisk(floodLabel);
         setDroughtRisk(droughtLabel);
@@ -428,6 +459,29 @@ const Dashboard = () => {
           </div>
         </div>
       </header>
+
+      {/* Input & Validation Alerts Section */}
+      <div className="card shadow-sm border-0 mb-4 p-3">
+        <h5 className="mb-0 fw-bold d-flex align-items-center gap-2">
+           <FaMapMarkedAlt className="text-primary" /> Update Location
+        </h5>
+        <CoordinateForm 
+          onSubmit={handleManualCoordinates} 
+          loading={loading} 
+          buttonText="Analyze Location" 
+          buttonColor="primary" 
+        />
+        {validationError && (
+          <div className="alert alert-danger mt-3 mb-0 d-flex align-items-center gap-2">
+            <FaExclamationTriangle /> <strong>Input Error:</strong> {validationError}
+          </div>
+        )}
+        {locationError && (
+          <div className="alert alert-warning mt-3 mb-0 d-flex align-items-center gap-2">
+            <FaWater /> <strong>Invalid Terrain:</strong> {locationError}
+          </div>
+        )}
+      </div>
 
       {/* Climate Resources Section */}
       <div className="bg-light py-4">
@@ -596,7 +650,7 @@ const Dashboard = () => {
                   <div className="card border-0 shadow-sm">
                     <div className="card-body">
                       <h6 className="fw-bold">Predicted Rainfall (next hours)</h6>
-                      <Line
+                      <Line 
                         data={{
                           labels: predictions.rainfall.map((_, idx) => `+${idx + 1}h`),
                           datasets: [

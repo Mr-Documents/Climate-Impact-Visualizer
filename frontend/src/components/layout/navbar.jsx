@@ -5,10 +5,10 @@ function Navbar() {
     <nav className="navbar navbar-expand-lg navbar-light bg-light px-3">
       <Link className="navbar-brand d-flex align-items-center gap-2" to="/">
         <img
-          src="/FullLogo_Transparent_NoBuffer.png"
+          src="/logo.png?v=2"
           alt="Climate Impact Visualizer logo"
           className="navbar-brand-logo"
-          style={{ width: '50px', height: '58px', marginLeft: '20px' }}
+          style={{ width: '70px', height: '68px', marginLeft: '20px' }}
         />
         <span className="visually-hidden">Climate Impact Visualizer</span>
       </Link>
