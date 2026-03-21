@@ -5,7 +5,7 @@ import WeatherIcon from "../components/ui/weathericon";
 import axios from "axios";
 import ResultCard from "../components/reusable/resultcard";
 import { Line } from 'react-chartjs-2';
-import { FaInfoCircle } from "react-icons/fa";
+import { FaInfoCircle, FaExclamationTriangle, FaWater } from "react-icons/fa";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -31,11 +31,22 @@ const FloodRiskPage = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
+  const [validationError, setValidationError] = useState(null);
+  const [locationError, setLocationError] = useState(null);
 
   const handleAnalyze = async (lat, lon) => {
+    // 1. Validation
+    if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      setValidationError("Invalid coordinates. Latitude must be between -90 and 90, Longitude between -180 and 180.");
+      return;
+    }
+    setValidationError(null);
+    setLocationError(null);
+
     setCoords({ lat, lon });
     setLoading(true);
     setData(null);
+    setLocationError(null);
 
     try {
       // Using the trained model endpoint
@@ -44,6 +55,11 @@ const FloodRiskPage = () => {
         longitude: lon,
       });
       setData(response.data);
+
+      // 2. Check for Water Body
+      if (response.data?.isWater) {
+        setLocationError("Analysis Unavailable: The selected location is identified as a water body. Flood risk assessment is not applicable.");
+      }
     } catch (err) {
       console.error(err);
       alert("Failed to analyze flood risk");
@@ -52,7 +68,15 @@ const FloodRiskPage = () => {
     }
   };
 
-  const floodPrediction = data?.prediction?.flood;
+  // Derived state for display
+  const isWater = data?.isWater || false;
+  const rawPrediction = data?.prediction?.flood;
+  
+  // If water, override prediction values
+  const floodPrediction = isWater 
+    ? { label: '--', score: 0 } 
+    : rawPrediction;
+
   const weather = data?.weather;
   const history = data?.history;
 
@@ -86,12 +110,16 @@ const FloodRiskPage = () => {
   };
 
   const getRiskColor = (label) => {
-    if (label === 'High') return 'danger';
-    if (label === 'Medium') return 'warning';
-    return 'success';
+    if (!label || label === '--' || label === 'N/A') return 'secondary';
+    const norm = label.toString().toLowerCase();
+    if (norm === 'high') return 'danger';
+    if (norm === 'medium') return 'warning';
+    if (norm === 'low') return 'success';
+    return 'secondary'; // Default to gray for unknown states
   };
 
   const getInsight = (label) => {
+    if (label === '--') return "Analysis Unavailable: The selected location is identified as a water body or non-terrestrial surface. Flood risk assessment is not applicable.";
     if (label === 'High') return "Critical levels of soil moisture and precipitation detected. The AI model indicates a significant probability of runoff and flash flooding. Avoid low-lying areas.";
     if (label === 'Medium') return "Moderate risk conditions observed. Soil saturation is increasing; continued rainfall may lead to localized waterlogging.";
     return "Environmental conditions are stable. Current precipitation and soil saturation levels are within safe limits, posing no immediate flood threat.";
@@ -112,6 +140,16 @@ const FloodRiskPage = () => {
             buttonText="Analyze Flood Risk"
             buttonColor="primary"
           />
+          {validationError && (
+            <div className="alert alert-danger mt-3 mb-0 small d-flex align-items-center gap-2">
+              <FaExclamationTriangle /> {validationError}
+            </div>
+          )}
+          {locationError && (
+            <div className="alert alert-warning mt-3 mb-0 small d-flex align-items-center gap-2">
+              <FaWater /> {locationError}
+            </div>
+          )}
           <div className="mt-3">
             <UnifiedMap
               lat={coords.lat}
@@ -129,7 +167,7 @@ const FloodRiskPage = () => {
             </div>
           )}
 
-          {!loading && data && floodPrediction && (
+          {!loading && data && (floodPrediction || isWater) && (
             <div className="d-flex flex-column gap-3">
               <ResultCard
                 title="Prediction Result"
@@ -138,11 +176,11 @@ const FloodRiskPage = () => {
               >
                 <div className="row text-center">
                   <div className="col-6">
-                    <h3 className={`text-${getRiskColor(floodPrediction.label)}`}>{floodPrediction.label}</h3>
+                    <h3 className={`text-${getRiskColor(floodPrediction?.label || '--')}`}>{floodPrediction?.label || '--'}</h3>
                     <small className="text-muted">Risk Level</small>
                   </div>
                   <div className="col-6">
-                    <h3>{(floodPrediction.score * 100).toFixed(1)}%</h3>
+                    <h3>{isWater || floodPrediction?.label === '--' ? '--' : `${(floodPrediction?.score * 100).toFixed(1)}%`}</h3>
                     <small className="text-muted">Confidence Score</small>
                   </div>
                 </div>
@@ -154,7 +192,7 @@ const FloodRiskPage = () => {
                   </div>
                   <div className="col-4">
                     <strong>Soil Moisture</strong><br />
-                    {weather.soilMoisture} m³/m³
+                    {weather.soilMoisture ?? '--'} m³/m³
                   </div>
                   <div className="col-4">
                     <strong>Wind Speed</strong><br />
@@ -163,18 +201,18 @@ const FloodRiskPage = () => {
                 </div>
               </ResultCard>
 
-              {chartData && (
+              {chartData && !isWater && (
                 <div className="card shadow-sm p-3">
                   <h5>24-Hour Environmental Trend</h5>
                   <Line options={chartOptions} data={chartData} />
                 </div>
               )}
 
-              <div className={`alert ${floodPrediction.label === 'High' ? 'alert-danger' : floodPrediction.label === 'Medium' ? 'alert-warning' : 'alert-success'} shadow-sm border-0 d-flex gap-3 align-items-start`}>
+              <div className={`alert ${floodPrediction?.label === 'High' ? 'alert-danger' : floodPrediction?.label === 'Medium' ? 'alert-warning' : floodPrediction?.label === '--' ? 'alert-secondary' : 'alert-success'} shadow-sm border-0 d-flex gap-3 align-items-start`}>
                 <FaInfoCircle className="mt-1 flex-shrink-0" size={20} />
                 <div>
                   <h5 className="alert-heading fw-bold h6">AI Prediction Insight</h5>
-                  <p className="mb-0 small">{getInsight(floodPrediction.label)}</p>
+                  <p className="mb-0 small">{getInsight(floodPrediction?.label)}</p>
                 </div>
               </div>
             </div>

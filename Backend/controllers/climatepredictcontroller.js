@@ -26,9 +26,14 @@ export async function predictClimate(req, res) {
     const windSpeed = current.wind_speed_10m || 0;
     const temperature = current.temperature_2m || 25;
     
-    // Check for water body (Open-Meteo returns null for soil moisture over water)
+    // Check for water body (Open-Meteo returns null for soil moisture over water in hourly data)
     let soilMoisture = current.soil_moisture_0_1cm;
-    const isWater = soilMoisture === null || soilMoisture === undefined;
+    const hourlySoil = data.hourly?.soil_moisture_0_1cm || [];
+    
+    // Consider it water if current is null, OR if valid hourly readings are non-existent (all nulls)
+    const hasValidHistory = hourlySoil.some(v => v !== null && v !== undefined);
+    const isWater = (soilMoisture === null || soilMoisture === undefined) || !hasValidHistory;
+
     if (isWater) soilMoisture = 0; // Default for calculation safety, but prediction will be skipped
 
     const humidity = current.relative_humidity_2m || 60;
@@ -108,7 +113,8 @@ export async function predictClimate(req, res) {
     }
 
     // Call the updated prediction function (flood + drought)
-    let prediction = { drought: { score: 0, label: 'N/A' }, flood: { score: 0, label: 'N/A' } };
+    // Default to '--' if water/invalid so frontend treats it as invalid data
+    let prediction = { drought: { score: 0, label: '--' }, flood: { score: 0, label: '--' } };
     
     if (!isWater) {
       prediction = await predictClimateRisk(featuresSequence);

@@ -14,7 +14,7 @@ const DocumentationPage = () => (
 
     <h5>Getting started</h5>
     <p className="text-muted">
-      Use the navigation links to explore the dashboard, run predictions, and view historical records. Each page includes context and guidance to help you interpret the information.
+      Use the navigation links to explore the dashboard and run predictions. Each page includes context and guidance to help you interpret the information.
     </p>
 
     <h5>Data sources</h5>

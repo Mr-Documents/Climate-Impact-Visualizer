@@ -40,7 +40,7 @@ ChartJS.register(
 
 // ----- Helpers -----
 const humanizeRisk = (label) => {
-  if (!label) return "N/A";
+  if (!label || label === "N/A") return "--";
   if (label === "--") return "--";
   const normalized = label.toString().toLowerCase();
   if (normalized === "high") return "High";
@@ -85,6 +85,7 @@ const computeAverage = (arr) => {
 function RiskGauge({ label, value = 0, icon, title }) {
   const pct = Math.min(1, Math.max(0, value));
   const color = getRiskColor(label);
+  const isInvalid = label === "--" || label === "N/A";
 
   return (
     <div className="card shadow-sm border-0 p-3">
@@ -110,7 +111,7 @@ function RiskGauge({ label, value = 0, icon, title }) {
               color: "#343a40"
             }}
           >
-            {Math.round(pct * 100)}%
+            {isInvalid ? "--" : `${Math.round(pct * 100)}%`}
           </div>
         </div>
       </div>
@@ -160,6 +161,7 @@ function MapOverlays({ center, layers }) {
 const Dashboard = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
   const [loading, setLoading] = useState(true);
+  const [isWaterBody, setIsWaterBody] = useState(false);
 
   const [rainData, setRainData] = useState([]);
   const [tempData, setTempData] = useState([]);
@@ -290,6 +292,13 @@ const Dashboard = () => {
   const fetchAllData = useCallback(
     async (lat, lon) => {
       setLoading(true);
+      // Reset risks to "--" immediately to clear previous location's data
+      setFloodRisk("--");
+      setDroughtRisk("--");
+      setFloodScore(0);
+      setDroughtScore(0);
+      setIsWaterBody(false); 
+      setLocationError(null);
 
       try {
         // rainRes (precipitation endpoint) and weatherRes (weather endpoint) now return past+future data
@@ -349,10 +358,11 @@ const Dashboard = () => {
 
         // --- AI predictions ---
         const isWater = predictionRes.data?.isWater || false;
+        setIsWaterBody(isWater);
         const predictionData = predictionRes.data?.prediction || {};
         
-        let floodLabel = predictionData.flood?.label ?? "N/A";
-        let droughtLabel = predictionData.drought?.label ?? "N/A";
+        let floodLabel = predictionData.flood?.label ?? "--";
+        let droughtLabel = predictionData.drought?.label ?? "--";
         let floodSc = predictionData.flood?.score ?? 0;
         let droughtSc = predictionData.drought?.score ?? 0;
 
@@ -552,7 +562,7 @@ const Dashboard = () => {
                   {card.icon}
                 </div>
                 <div>
-                  <div className="text-secondary small fw-semibold">{card.label}</div>
+                  <div className="text-secondary small fw-semibold text-uppercase">{card.label}</div>
                   <div className="fs-5 fw-bold">{card.value}</div>
                   <div className="text-muted small">{card.caption}</div>
                 </div>
@@ -709,7 +719,7 @@ const Dashboard = () => {
                       <h6 className="fw-bold">Predicted Flood Probability</h6>
                       <div className="d-flex align-items-center gap-3">
                         <div className="fs-2 fw-bold" style={{ color: getRiskColor(floodRisk) }}>
-                          {(predictions.floodProbability * 100).toFixed(0)}%
+                          {isWaterBody ? "--" : `${(predictions.floodProbability * 100).toFixed(0)}%`}
                         </div>
                         <div className="text-muted small">Based on current rainfall, soil moisture and wind conditions.</div>
                       </div>
@@ -722,7 +732,7 @@ const Dashboard = () => {
                       <h6 className="fw-bold">Predicted Drought Risk</h6>
                       <div className="d-flex align-items-center gap-3">
                         <div className="fs-2 fw-bold" style={{ color: getRiskColor(droughtRisk) }}>
-                          {(predictions.droughtProbability * 100).toFixed(0)}%
+                          {isWaterBody ? "--" : `${(predictions.droughtProbability * 100).toFixed(0)}%`}
                         </div>
                         <div className="text-muted small">Model scores are derived from current temperature, humidity and soil moisture.</div>
                       </div>
