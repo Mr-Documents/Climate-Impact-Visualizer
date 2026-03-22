@@ -64,18 +64,6 @@ function Navbar() {
           </li>
 
           <li className="nav-item">
-            <Link className="nav-link" to="/historical">
-              Historical Data
-            </Link>
-          </li>
-
-          <li className="nav-item">
-            <Link className="nav-link" to="/alerts">
-              Alerts
-            </Link>
-          </li>
-
-          <li className="nav-item">
             <Link className="nav-link" to="/docs">
               Documentation
             </Link>

@@ -18,7 +18,8 @@ export const getUVDryness = async (req, res) => {
 
   try {
     // Open-Meteo Forecast API: 'uv_index' and 'vapour_pressure_deficit'
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${safeLat}&longitude=${safeLon}&current=uv_index,vapour_pressure_deficit&hourly=uv_index,vapour_pressure_deficit`;
+    // Removed vapour_pressure_deficit from current= (it is hourly only) to prevent API warnings
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${safeLat}&longitude=${safeLon}&current=uv_index,is_day&hourly=uv_index,vapour_pressure_deficit`;
     const response = await axios.get(url);
     const { current, hourly } = response.data;
 
@@ -28,7 +29,8 @@ export const getUVDryness = async (req, res) => {
       drynessIndex: hourly.vapour_pressure_deficit?.[i] ?? null,
     }));
 
-    res.json({ location: { lat: safeLat, lon: safeLon }, current, series });
+    // Pass 'hourly' raw data so the frontend helper `getHourlyValue` can extract specific hour data
+    res.json({ location: { lat: safeLat, lon: safeLon }, current, hourly, series });
   } catch (error) {
     console.error('UV/Dryness fetch error:', error.message);
     res.status(500).json({ error: 'Failed to fetch UV/Dryness data' });

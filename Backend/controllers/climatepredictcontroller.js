@@ -133,3 +133,26 @@ export async function predictClimate(req, res) {
     res.status(500).json({ error: 'Prediction failed', details: err.message });
   }
 }
+
+/**
+ * Handles /api/uv-dryness requests
+ * Fetches UV Index and Vapour Pressure Deficit (Dryness)
+ */
+export async function getUVDryness(req, res) {
+  try {
+    const { lat, lon } = req.query;
+    if (!lat || !lon) return res.status(400).json({ error: 'Coordinates required' });
+
+    // Open-Meteo API for UV (hourly/current) and VPD (hourly)
+    // Removed &timezone=auto to ensure response uses UTC, matching frontend's ISO date comparison
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=uv_index,vapour_pressure_deficit&current=uv_index,is_day&forecast_days=1`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    res.json(data);
+  } catch (err) {
+    console.error("UV/Dryness Fetch Error:", err);
+    res.status(500).json({ error: "Failed to retrieve UV and Dryness data" });
+  }
+}
