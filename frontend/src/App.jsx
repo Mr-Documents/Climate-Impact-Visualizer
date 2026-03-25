@@ -4,8 +4,6 @@ import Footer from "./components/layout/footer";
 
 import Dashboard from "./pages/dashboard";
 import MapPage from "./pages/map";
-import HistoricalDataPage from "./pages/historicaldata";
-import AlertsPage from "./pages/alerts";
 import DocumentationPage from "./pages/documentation";
 import DroughtRisk from "./pages/droughtrisk";
 
@@ -21,8 +19,6 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/map" element={<MapPage />} />
-        <Route path="/historical" element={<HistoricalDataPage />} />
-        <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/docs" element={<DocumentationPage />} />
         <Route path="/drought" element={<DroughtRisk />} />
 

@@ -28,16 +28,6 @@ function Footer() {
                   Map Overview
                 </Link>
               </li>
-              <li className="mb-2">
-                <Link className="text-primary text-decoration-none" to="/alerts">
-                  Alerts
-                </Link>
-              </li>
-              <li className="mb-2">
-                <Link className="text-primary text-decoration-none" to="/historical">
-                  Historical Data
-                </Link>
-              </li>
             </ul>
           </div>
         </div>

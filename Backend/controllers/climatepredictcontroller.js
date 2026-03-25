@@ -25,7 +25,17 @@ export async function predictClimate(req, res) {
     const precipitation = current.precipitation || 0;
     const windSpeed = current.wind_speed_10m || 0;
     const temperature = current.temperature_2m || 25;
-    const soilMoisture = current.soil_moisture_0_1cm || 0.2;
+    
+    // Check for water body (Open-Meteo returns null for soil moisture over water in hourly data)
+    let soilMoisture = current.soil_moisture_0_1cm;
+    const hourlySoil = data.hourly?.soil_moisture_0_1cm || [];
+    
+    // Consider it water if current is null, OR if valid hourly readings are non-existent (all nulls)
+    const hasValidHistory = hourlySoil.some(v => v !== null && v !== undefined);
+    const isWater = (soilMoisture === null || soilMoisture === undefined) || !hasValidHistory;
+
+    if (isWater) soilMoisture = 0; // Default for calculation safety, but prediction will be skipped
+
     const humidity = current.relative_humidity_2m || 60;
 
     // For LSTM, we need a sequence; here we create a simple 24-hour sequence using same values repeated
@@ -103,17 +113,46 @@ export async function predictClimate(req, res) {
     }
 
     // Call the updated prediction function (flood + drought)
-    const prediction = await predictClimateRisk(featuresSequence);
+    // Default to '--' if water/invalid so frontend treats it as invalid data
+    let prediction = { drought: { score: 0, label: '--' }, flood: { score: 0, label: '--' } };
+    
+    if (!isWater) {
+      prediction = await predictClimateRisk(featuresSequence);
+    }
 
     res.json({
       location: { latitude, longitude },
-      weather: { precipitation, soilMoisture, windSpeed, temperature, humidity },
+      weather: { precipitation, soilMoisture: isWater ? null : soilMoisture, windSpeed, temperature, humidity },
       history: historyData,
-      prediction // contains { drought: { score, label }, flood: { score, label } }
+      prediction, // contains { drought: { score, label }, flood: { score, label } }
+      isWater // Flag to alert frontend
     });
 
   } catch (err) {
     console.error('Prediction error:', err);
     res.status(500).json({ error: 'Prediction failed', details: err.message });
+  }
+}
+
+/**
+ * Handles /api/uv-dryness requests
+ * Fetches UV Index and Vapour Pressure Deficit (Dryness)
+ */
+export async function getUVDryness(req, res) {
+  try {
+    const { lat, lon } = req.query;
+    if (!lat || !lon) return res.status(400).json({ error: 'Coordinates required' });
+
+    // Open-Meteo API for UV (hourly/current) and VPD (hourly)
+    // Removed &timezone=auto to ensure response uses UTC, matching frontend's ISO date comparison
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=uv_index,vapour_pressure_deficit&current=uv_index,is_day&forecast_days=1`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    res.json(data);
+  } catch (err) {
+    console.error("UV/Dryness Fetch Error:", err);
+    res.status(500).json({ error: "Failed to retrieve UV and Dryness data" });
   }
 }
