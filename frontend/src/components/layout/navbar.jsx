@@ -2,13 +2,13 @@ import { Link } from "react-router-dom";
 
 function Navbar() {
   return (
-    <nav className="navbar navbar-expand-lg navbar-light bg-light px-3">
+    <nav className="navbar navbar-expand-lg navbar-light bg-transparent px-3">
       <Link className="navbar-brand d-flex align-items-center gap-2" to="/">
         <img
-          src="/logo.png?v=2"
+          src="/climate_visualizer_transparent.png"
           alt="Climate Impact Visualizer logo"
           className="navbar-brand-logo"
-          style={{ width: '70px', height: '68px', marginLeft: '20px' }}
+          style={{ width: '94px', height: '68px', marginLeft: '20px' }}
         />
         <span className="visually-hidden">Climate Impact Visualizer</span>
       </Link>

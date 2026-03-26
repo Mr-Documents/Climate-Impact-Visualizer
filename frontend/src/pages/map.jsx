@@ -151,7 +151,11 @@ const MapPage = () => {
       {/* Hero Section */}
       <header className="dashboard-hero mb-4 rounded-4 overflow-hidden bg-dark text-white p-4 p-md-5 position-relative shadow">
         <div className="position-absolute top-0 end-0 p-4 opacity-10">
-          <FaGlobe size={150} />
+          <img 
+            src="/climate_visualizer_transparent.png" 
+            alt="Background Logo" 
+            style={{ width: '200px', filter: 'brightness(0) invert(1)' }} 
+          />
         </div>
         <div className="position-relative z-1">
           <h1 className="h2 fw-bold mb-2">Climate Overview</h1>
