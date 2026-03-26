@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 function Navbar() {
   return (
-    <nav className="navbar navbar-expand-lg navbar-light bg-transparent px-3">
+    <nav className="navbar navbar-expand-lg navbar-light bg-light px-3">
       <Link className="navbar-brand d-flex align-items-center gap-2" to="/">
         <img
           src="/climate_visualizer_transparent.png"
