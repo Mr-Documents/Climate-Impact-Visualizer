@@ -24,7 +24,7 @@ try {
 }
 
 // --- 1. DATASET CONFIGURATION ---
-const DATASET_PATH = path.join(__dirname, 'data', 'dataset-10yrs.csv');
+const DATASET_PATH = path.join(__dirname, 'data', 'training_dataset.csv');
 
 // Features for both flood & drought prediction
 const RAW_FEATURE_COLUMNS = [
@@ -49,15 +49,15 @@ const TIME_STEPS = 24; // look-back 24 hours
 const TRAIN_SPLIT = 0.8;
 
 // --- 3. HELPER FUNCTIONS ---
-function processRow(row) {
+function processRow(row, prefix) {
   // Parse numeric features
-  const temp = parseFloat(row['Basel Temperature [2 m elevation corrected]']);
-  const humidity = parseFloat(row['Basel Relative Humidity [2 m]']);
-  const soil = parseFloat(row['Basel Soil Moisture [0-7 cm down]']);
-  const windSpeed = parseFloat(row['Basel Wind Speed [10 m]']);
-  const windDir = parseFloat(row['Basel Wind Direction [10 m]']);
-  const vpd = parseFloat(row['Basel Vapor Pressure Deficit [2 m]']);
-  const precip = parseFloat(row['Basel Precipitation Total']);
+  const temp = parseFloat(row[`${prefix}_Temp`]);
+  const humidity = parseFloat(row[`${prefix}_Humidity`]);
+  const soil = parseFloat(row[`${prefix}_SoilMoisture`]);
+  const windSpeed = parseFloat(row[`${prefix}_WindSpeed`]);
+  const windDir = parseFloat(row[`${prefix}_WindDir`]);
+  const vpd = parseFloat(row[`${prefix}_VPD`]);
+  const precip = parseFloat(row[`${prefix}_Precip`]);
 
   // Timestamp features
   const ts = row.timestamp || row['\ufefftimestamp']; // Handle potential BOM
@@ -121,13 +121,17 @@ function createSequences(featuresTensor, labelsTensor, timeSteps) {
 async function loadDataset() {
   const rawData = [];
   let headers = [];
+  const locationPrefixes = ['Addis_Ababa', 'Nairobi', 'Sao_Paulo', 'Madrid', 'Accra'];
+
   return new Promise((resolve, reject) => {
     fs.createReadStream(DATASET_PATH)
       .pipe(csv())
       .on('headers', (h) => headers = h)
       .on('data', row => {
-        const processed = processRow(row);
-        if (processed) rawData.push(processed);
+        locationPrefixes.forEach(prefix => {
+          const processed = processRow(row, prefix);
+          if (processed) rawData.push(processed);
+        });
       })
       .on('end', () => {
         if (rawData.length === 0) {
@@ -148,6 +152,28 @@ async function loadDataset() {
       })
       .on('error', reject);
   });
+}
+
+// --- 4.5. LOAD EXISTING MODEL FOR INCREMENTAL TRAINING ---
+async function loadModelIfExists(modelName, numFeatures) {
+  const savePath = path.join(__dirname, `saved_model_${modelName}`);
+  const modelJsonPath = path.join(savePath, 'model.json');
+
+  if (fs.existsSync(modelJsonPath)) {
+    console.log(`\n[INFO] Existing ${modelName} model found. Training on top of existing knowledge...`);
+    let loadUrl = savePath;
+    if (process.platform === 'win32') loadUrl = loadUrl.replace(/\\/g, '/');
+    const model = await tf.loadLayersModel(`file://${loadUrl}/model.json`);
+    model.compile({
+      optimizer: tf.train.adam(LEARNING_RATE),
+      loss: 'categoricalCrossentropy',
+      metrics: ['accuracy']
+    });
+    return model;
+  } else {
+    console.log(`\n[INFO] No existing ${modelName} model found. Starting fresh training...`);
+    return createLSTMModel(numFeatures);
+  }
 }
 
 // --- 5. CREATE LSTM MODEL ---
@@ -194,9 +220,9 @@ async function trainModel(featuresTensor, labelsTensor, modelName) {
   const xVal = xs.slice([splitIndex,0,0], [xs.shape[0]-splitIndex, TIME_STEPS, xs.shape[2]]);
   const yVal = ys.slice([splitIndex,0], [ys.shape[0]-splitIndex, ys.shape[1]]);
 
-  const model = createLSTMModel(xs.shape[2]);
+  const model = await loadModelIfExists(modelName, xs.shape[2]);
 
-  console.log(`\nTraining ${modelName} model...`);
+  console.log(`Starting training for ${modelName}...`);
   await model.fit(xTrain, yTrain, {
     epochs: EPOCHS,
     batchSize: BATCH_SIZE,
