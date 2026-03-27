@@ -176,28 +176,6 @@ async function loadDataset() {
   });
 }
 
-// --- 4.5. LOAD EXISTING MODEL FOR INCREMENTAL TRAINING ---
-async function loadModelIfExists(modelName, numFeatures) {
-  const savePath = path.join(__dirname, `saved_model_${modelName}`);
-  const modelJsonPath = path.join(savePath, 'model.json');
-
-  if (fs.existsSync(modelJsonPath)) {
-    console.log(`\n[INFO] Existing ${modelName} model found. Training on top of existing knowledge...`);
-    let loadUrl = savePath;
-    if (process.platform === 'win32') loadUrl = loadUrl.replace(/\\/g, '/');
-    const model = await tf.loadLayersModel(`file://${loadUrl}/model.json`);
-    model.compile({
-      optimizer: tf.train.adam(LEARNING_RATE),
-      loss: 'categoricalCrossentropy',
-      metrics: ['accuracy']
-    });
-    return model;
-  } else {
-    console.log(`\n[INFO] No existing ${modelName} model found. Starting fresh training...`);
-    return createLSTMModel(numFeatures);
-  }
-}
-
 // --- 5. CREATE LSTM MODEL ---
 function createLSTMModel(numFeatures) {
   const model = tf.sequential();
@@ -242,9 +220,10 @@ async function trainModel(featuresTensor, labelsTensor, modelName) {
   const xVal = xs.slice([splitIndex,0,0], [xs.shape[0]-splitIndex, TIME_STEPS, xs.shape[2]]);
   const yVal = ys.slice([splitIndex,0], [ys.shape[0]-splitIndex, ys.shape[1]]);
 
-  const model = await loadModelIfExists(modelName, xs.shape[2]);
+  // Always start with a fresh model for full retraining on the merged dataset
+  const model = createLSTMModel(xs.shape[2]);
 
-  console.log(`Starting training for ${modelName}...`);
+  console.log(`\n[RE-TRAINING] Starting fresh training for ${modelName} using the combined dataset...`);
   await model.fit(xTrain, yTrain, {
     epochs: EPOCHS,
     batchSize: BATCH_SIZE,
