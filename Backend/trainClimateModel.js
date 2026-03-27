@@ -24,17 +24,9 @@ try {
 }
 
 // --- 1. DATASET CONFIGURATION ---
-const DATASET_PATH = path.join(__dirname, 'data', 'training_dataset.csv');
-
-// Features for both flood & drought prediction
-const RAW_FEATURE_COLUMNS = [
-  'Temperature',
-  'Relative Humidity',
-  'Soil Moisture',
-  'Wind Speed',
-  'Wind Direction',
-  'Vapor Pressure Deficit',
-  'Precipitation Total' // needed only for flood risk label generation
+const DATASETS = [
+  { path: path.join(__dirname, 'data', 'dataset-10yrs.csv'), isBasel: true },
+  { path: path.join(__dirname, 'data', 'training_dataset.csv'), isBasel: false }
 ];
 
 // Label columns
@@ -49,15 +41,28 @@ const TIME_STEPS = 24; // look-back 24 hours
 const TRAIN_SPLIT = 0.8;
 
 // --- 3. HELPER FUNCTIONS ---
-function processRow(row, prefix) {
-  // Parse numeric features
-  const temp = parseFloat(row[`${prefix}_Temp`]);
-  const humidity = parseFloat(row[`${prefix}_Humidity`]);
-  const soil = parseFloat(row[`${prefix}_SoilMoisture`]);
-  const windSpeed = parseFloat(row[`${prefix}_WindSpeed`]);
-  const windDir = parseFloat(row[`${prefix}_WindDir`]);
-  const vpd = parseFloat(row[`${prefix}_VPD`]);
-  const precip = parseFloat(row[`${prefix}_Precip`]);
+function processRow(row, prefix, isBasel = false) {
+  let temp, humidity, soil, windSpeed, windDir, vpd, precip;
+
+  if (isBasel) {
+    // Map Basel-specific long column names
+    temp = parseFloat(row['Basel Temperature [2 m elevation corrected]']);
+    humidity = parseFloat(row['Basel Relative Humidity [2 m]']);
+    soil = parseFloat(row['Basel Soil Moisture [0-7 cm down]']);
+    windSpeed = parseFloat(row['Basel Wind Speed [10 m]']);
+    windDir = parseFloat(row['Basel Wind Direction [10 m]']);
+    vpd = parseFloat(row['Basel Vapor Pressure Deficit [2 m]']);
+    precip = parseFloat(row['Basel Precipitation Total']);
+  } else {
+    // Map Global dataset short column names
+    temp = parseFloat(row[`${prefix}_Temp`]);
+    humidity = parseFloat(row[`${prefix}_Humidity`]);
+    soil = parseFloat(row[`${prefix}_SoilMoisture`]);
+    windSpeed = parseFloat(row[`${prefix}_WindSpeed`]);
+    windDir = parseFloat(row[`${prefix}_WindDir`]);
+    vpd = parseFloat(row[`${prefix}_VPD`]);
+    precip = parseFloat(row[`${prefix}_Precip`]);
+  }
 
   // Timestamp features
   const ts = row.timestamp || row['\ufefftimestamp']; // Handle potential BOM
@@ -120,25 +125,41 @@ function createSequences(featuresTensor, labelsTensor, timeSteps) {
 // --- 4. LOAD DATA ---
 async function loadDataset() {
   const rawData = [];
-  let headers = [];
   const locationPrefixes = ['Addis_Ababa', 'Nairobi', 'Sao_Paulo', 'Madrid', 'Accra'];
 
-  return new Promise((resolve, reject) => {
-    fs.createReadStream(DATASET_PATH)
-      .pipe(csv())
-      .on('headers', (h) => headers = h)
-      .on('data', row => {
-        locationPrefixes.forEach(prefix => {
-          const processed = processRow(row, prefix);
-          if (processed) rawData.push(processed);
-        });
-      })
-      .on('end', () => {
+  const readCsvFile = (config) => {
+    return new Promise((resolve, reject) => {
+      if (!fs.existsSync(config.path)) {
+        console.warn(`[WARN] Skipping missing file: ${config.path}`);
+        return resolve();
+      }
+      
+      fs.createReadStream(config.path)
+        .pipe(csv())
+        .on('data', row => {
+          const prefixes = config.isBasel ? ['Basel'] : locationPrefixes;
+          prefixes.forEach(prefix => {
+            const processed = processRow(row, prefix, config.isBasel);
+            if (processed) rawData.push(processed);
+          });
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+  };
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      for (const ds of DATASETS) {
+        console.log(`Ingesting: ${path.basename(ds.path)}...`);
+        await readCsvFile(ds);
+      }
+
         if (rawData.length === 0) {
-          console.error("\n[ERROR] No valid data rows found.");
-          console.error("Detected CSV Headers:", headers);
-          return reject(new Error("Dataset empty or 'timestamp' column missing/mismatched. Check case sensitivity."));
+          return reject(new Error("Combined dataset is empty. Ensure data files are in the /data folder."));
         }
+        
+        console.log(`Merged Pool Size: ${rawData.length} total sequences.`);
 
         const featuresArray = rawData.map(r => r.features);
         const droughtLabelsArray = rawData.map(r => r.droughtLabel);
@@ -149,8 +170,9 @@ async function loadDataset() {
         const floodLabelsTensor = tf.tensor1d(floodLabelsArray, 'int32');
 
         resolve({ featuresTensor, droughtLabelsTensor, floodLabelsTensor });
-      })
-      .on('error', reject);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
