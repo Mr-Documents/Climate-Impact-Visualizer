@@ -24,17 +24,9 @@ try {
 }
 
 // --- 1. DATASET CONFIGURATION ---
-const DATASET_PATH = path.join(__dirname, 'data', 'dataset-10yrs.csv');
-
-// Features for both flood & drought prediction
-const RAW_FEATURE_COLUMNS = [
-  'Temperature',
-  'Relative Humidity',
-  'Soil Moisture',
-  'Wind Speed',
-  'Wind Direction',
-  'Vapor Pressure Deficit',
-  'Precipitation Total' // needed only for flood risk label generation
+const DATASETS = [
+  { path: path.join(__dirname, 'data', 'dataset-10yrs.csv'), isBasel: true },
+  { path: path.join(__dirname, 'data', 'training_dataset.csv'), isBasel: false }
 ];
 
 // Label columns
@@ -43,21 +35,34 @@ const FLOOD_LABEL = 'flood_risk'; // will be generated automatically
 
 // --- 2. MODEL HYPERPARAMETERS ---
 const LEARNING_RATE = 0.001;
-const EPOCHS = 50;
+const EPOCHS = 25;
 const BATCH_SIZE = 32;
 const TIME_STEPS = 24; // look-back 24 hours
 const TRAIN_SPLIT = 0.8;
 
 // --- 3. HELPER FUNCTIONS ---
-function processRow(row) {
-  // Parse numeric features
-  const temp = parseFloat(row['Basel Temperature [2 m elevation corrected]']);
-  const humidity = parseFloat(row['Basel Relative Humidity [2 m]']);
-  const soil = parseFloat(row['Basel Soil Moisture [0-7 cm down]']);
-  const windSpeed = parseFloat(row['Basel Wind Speed [10 m]']);
-  const windDir = parseFloat(row['Basel Wind Direction [10 m]']);
-  const vpd = parseFloat(row['Basel Vapor Pressure Deficit [2 m]']);
-  const precip = parseFloat(row['Basel Precipitation Total']);
+function processRow(row, prefix, isBasel = false) {
+  let temp, humidity, soil, windSpeed, windDir, vpd, precip;
+
+  if (isBasel) {
+    // Map Basel-specific long column names
+    temp = parseFloat(row['Basel Temperature [2 m elevation corrected]']);
+    humidity = parseFloat(row['Basel Relative Humidity [2 m]']);
+    soil = parseFloat(row['Basel Soil Moisture [0-7 cm down]']);
+    windSpeed = parseFloat(row['Basel Wind Speed [10 m]']);
+    windDir = parseFloat(row['Basel Wind Direction [10 m]']);
+    vpd = parseFloat(row['Basel Vapor Pressure Deficit [2 m]']);
+    precip = parseFloat(row['Basel Precipitation Total']);
+  } else {
+    // Map Global dataset short column names
+    temp = parseFloat(row[`${prefix}_Temp`]);
+    humidity = parseFloat(row[`${prefix}_Humidity`]);
+    soil = parseFloat(row[`${prefix}_SoilMoisture`]);
+    windSpeed = parseFloat(row[`${prefix}_WindSpeed`]);
+    windDir = parseFloat(row[`${prefix}_WindDir`]);
+    vpd = parseFloat(row[`${prefix}_VPD`]);
+    precip = parseFloat(row[`${prefix}_Precip`]);
+  }
 
   // Timestamp features
   const ts = row.timestamp || row['\ufefftimestamp']; // Handle potential BOM
@@ -105,48 +110,70 @@ function normalizeTensor(tensor) {
 
 // Create sequences for LSTM
 function createSequences(featuresTensor, labelsTensor, timeSteps) {
-  const xs = [];
-  const ys = [];
-  for (let i = 0; i < featuresTensor.shape[0] - timeSteps; i++) {
-    xs.push(featuresTensor.slice([i, 0], [timeSteps, featuresTensor.shape[1]]));
-    ys.push(labelsTensor.slice([i + timeSteps], [1]));
-  }
-  return {
-    xs: tf.stack(xs), // [samples, timeSteps, numFeatures]
-    ys: tf.oneHot(tf.concat(ys).cast('int32'), 3) // 3 classes
-  };
+  return tf.tidy(() => {
+    const xs = [];
+    const ys = [];
+    for (let i = 0; i < featuresTensor.shape[0] - timeSteps; i++) {
+      xs.push(featuresTensor.slice([i, 0], [timeSteps, featuresTensor.shape[1]]));
+      ys.push(labelsTensor.slice([i + timeSteps], [1]));
+    }
+    return {
+      xs: tf.stack(xs), // [samples, timeSteps, numFeatures]
+      ys: tf.oneHot(tf.concat(ys).cast('int32'), 3) // 3 classes
+    };
+  });
 }
 
 // --- 4. LOAD DATA ---
 async function loadDataset() {
   const rawData = [];
-  let headers = [];
-  return new Promise((resolve, reject) => {
-    fs.createReadStream(DATASET_PATH)
-      .pipe(csv())
-      .on('headers', (h) => headers = h)
-      .on('data', row => {
-        const processed = processRow(row);
-        if (processed) rawData.push(processed);
-      })
-      .on('end', () => {
+  const locationPrefixes = ['Addis_Ababa', 'Nairobi', 'Sao_Paulo', 'Madrid', 'Accra'];
+
+  const readCsvFile = (config) => {
+    return new Promise((resolve, reject) => {
+      if (!fs.existsSync(config.path)) {
+        console.warn(`[WARN] Skipping missing file: ${config.path}`);
+        return resolve();
+      }
+      
+      fs.createReadStream(config.path)
+        .pipe(csv())
+        .on('data', row => {
+          const prefixes = config.isBasel ? ['Basel'] : locationPrefixes;
+          prefixes.forEach(prefix => {
+            const processed = processRow(row, prefix, config.isBasel);
+            if (processed) rawData.push(processed);
+          });
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+  };
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      for (const ds of DATASETS) {
+        console.log(`Ingesting: ${path.basename(ds.path)}...`);
+        await readCsvFile(ds);
+      }
+
         if (rawData.length === 0) {
-          console.error("\n[ERROR] No valid data rows found.");
-          console.error("Detected CSV Headers:", headers);
-          return reject(new Error("Dataset empty or 'timestamp' column missing/mismatched. Check case sensitivity."));
+          return reject(new Error("Combined dataset is empty. Ensure data files are in the /data folder."));
         }
+        
+        console.log(`Merged Pool Size: ${rawData.length} total sequences.`);
 
-        const featuresArray = rawData.map(r => r.features);
-        const droughtLabelsArray = rawData.map(r => r.droughtLabel);
-        const floodLabelsArray = rawData.map(r => r.floodLabel);
+        const featuresTensor = tf.tensor2d(rawData.map(r => r.features));
+        const droughtLabelsTensor = tf.tensor1d(rawData.map(r => r.droughtLabel), 'int32');
+        const floodLabelsTensor = tf.tensor1d(rawData.map(r => r.floodLabel), 'int32');
 
-        const featuresTensor = tf.tensor2d(featuresArray);
-        const droughtLabelsTensor = tf.tensor1d(droughtLabelsArray, 'int32');
-        const floodLabelsTensor = tf.tensor1d(floodLabelsArray, 'int32');
+        // CRITICAL: Clear the JavaScript array immediately to free up V8 heap memory
+        rawData.length = 0; 
 
         resolve({ featuresTensor, droughtLabelsTensor, floodLabelsTensor });
-      })
-      .on('error', reject);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
@@ -154,7 +181,7 @@ async function loadDataset() {
 function createLSTMModel(numFeatures) {
   const model = tf.sequential();
   model.add(tf.layers.lstm({
-    units: 64,
+    units: 32,
     inputShape: [TIME_STEPS, numFeatures],
     returnSequences: false
   }));
@@ -184,19 +211,24 @@ async function saveModelToDisk(model, dirPath) {
 
 // --- 6. TRAIN FUNCTION ---
 async function trainModel(featuresTensor, labelsTensor, modelName) {
-  const { normalized: featuresNorm } = normalizeTensor(featuresTensor);
-  const { xs, ys } = createSequences(featuresNorm, labelsTensor, TIME_STEPS);
+  const { normalized: featuresNorm, mean, std } = normalizeTensor(featuresTensor);
 
-  // Train/Validation split
-  const splitIndex = Math.floor(xs.shape[0] * TRAIN_SPLIT);
-  const xTrain = xs.slice([0,0,0], [splitIndex, TIME_STEPS, xs.shape[2]]);
-  const yTrain = ys.slice([0,0], [splitIndex, ys.shape[1]]);
-  const xVal = xs.slice([splitIndex,0,0], [xs.shape[0]-splitIndex, TIME_STEPS, xs.shape[2]]);
-  const yVal = ys.slice([splitIndex,0], [ys.shape[0]-splitIndex, ys.shape[1]]);
+  // Split the base tensors BEFORE creating sequences to save massive amounts of RAM
+  const totalSamples = featuresNorm.shape[0];
+  const splitIndex = Math.floor(totalSamples * TRAIN_SPLIT);
 
-  const model = createLSTMModel(xs.shape[2]);
+  const featuresTrain = featuresNorm.slice([0, 0], [splitIndex, -1]);
+  const labelsTrain = labelsTensor.slice([0], [splitIndex]);
+  const featuresVal = featuresNorm.slice([splitIndex, 0], [-1, -1]);
+  const labelsVal = labelsTensor.slice([splitIndex], [-1]);
 
-  console.log(`\nTraining ${modelName} model...`);
+  // Create sequences only for the specific sets
+  const { xs: xTrain, ys: yTrain } = createSequences(featuresTrain, labelsTrain, TIME_STEPS);
+  const { xs: xVal, ys: yVal } = createSequences(featuresVal, labelsVal, TIME_STEPS);
+
+  const model = createLSTMModel(featuresNorm.shape[1]);
+
+  console.log(`\n[RE-TRAINING] Starting fresh training for ${modelName} using the combined dataset...`);
   await model.fit(xTrain, yTrain, {
     epochs: EPOCHS,
     batchSize: BATCH_SIZE,
@@ -211,6 +243,10 @@ async function trainModel(featuresTensor, labelsTensor, modelName) {
   const savePath = path.join(__dirname, `saved_model_${modelName}`);
   await saveModelToDisk(model, savePath);
   console.log(`${modelName} model saved at: ${savePath}`);
+
+  // Clean up all training-specific tensors to free memory for the next model
+  tf.dispose([featuresNorm, mean, std, featuresTrain, labelsTrain, featuresVal, labelsVal, xTrain, yTrain, xVal, yVal]);
+  model.dispose();
 }
 
 // --- 7. RUN ---
@@ -221,6 +257,8 @@ async function main() {
 
     await trainModel(featuresTensor, droughtLabelsTensor, 'drought');
     await trainModel(featuresTensor, floodLabelsTensor, 'flood');
+
+    tf.dispose([featuresTensor, droughtLabelsTensor, floodLabelsTensor]);
   } catch (err) {
     console.error(err);
   }

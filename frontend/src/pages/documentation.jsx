@@ -1,6 +1,6 @@
 import React from "react";
 import { 
-  FaBook, 
+  FaBook,
   FaInfoCircle, 
   FaDatabase, 
   FaCogs, 
@@ -73,9 +73,7 @@ const DocumentationPage = () => {
       <div className="row justify-content-center">
         <div className="col-lg-10">
           <div className="d-flex align-items-center gap-3 mb-5">
-            <div className="bg-primary p-3 rounded-4 shadow-sm">
-              <FaBook size={40} className="text-white" />
-            </div>
+            <FaBook size={40} className="text-primary" />
             <div>
               <h1 className="fw-bold mb-0">Technical Documentation</h1>
               <p className="text-muted mb-0">System Architecture, API Specifications, and User Guides</p>
