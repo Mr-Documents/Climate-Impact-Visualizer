@@ -255,7 +255,8 @@ async function main() {
     console.log('Loading dataset...');
     const { featuresTensor, droughtLabelsTensor, floodLabelsTensor } = await loadDataset();
 
-    await trainModel(featuresTensor, droughtLabelsTensor, 'drought');
+    // Skipping drought model as it is already trained and saved.
+    // await trainModel(featuresTensor, droughtLabelsTensor, 'drought');
     await trainModel(featuresTensor, floodLabelsTensor, 'flood');
 
     tf.dispose([featuresTensor, droughtLabelsTensor, floodLabelsTensor]);
