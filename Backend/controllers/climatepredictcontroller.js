@@ -14,8 +14,19 @@ export async function predictClimate(req, res) {
       return res.status(400).json({ error: 'latitude and longitude are required' });
     }
 
+    // 1. Reverse Geocoding for readable location name
+    const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`;
+    const geoRes = await fetch(geoUrl, { headers: { 'User-Agent': 'ClimateVisualizer/1.0' } });
+    const geoData = await geoRes.json();
+    const locationName = geoData.display_name?.split(',').slice(0, 3).join(',') || "Unknown Location";
+
+    // 2. Fetch 30-day Recent Snapshot
+    const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const snapshotUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=${lastMonth}&end_date=${new Date().toISOString().split('T')[0]}&daily=precipitation_sum,temperature_2m_mean&timezone=auto`;
+    const snapshotRes = await fetch(snapshotUrl);
+    const snapshotData = await snapshotRes.json();
+
     // Fetch current weather from Open-Meteo
-    // We need past data for the sequence (LSTM context)
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,soil_moisture_0_1cm&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,soil_moisture_0_1cm&past_days=1&forecast_days=1`;
     const response = await fetch(url);
     const data = await response.json();
@@ -122,8 +133,10 @@ export async function predictClimate(req, res) {
 
     res.json({
       location: { latitude, longitude },
+      locationName,
       weather: { precipitation, soilMoisture: isWater ? null : soilMoisture, windSpeed, temperature, humidity },
       history: historyData,
+      recentSnapshot: snapshotData.daily,
       prediction, // contains { drought: { score, label }, flood: { score, label } }
       isWater // Flag to alert frontend
     });
@@ -131,6 +144,51 @@ export async function predictClimate(req, res) {
   } catch (err) {
     console.error('Prediction error:', err);
     res.status(500).json({ error: 'Prediction failed', details: err.message });
+  }
+}
+
+/**
+ * Deep Historical Analysis Engine (30+ Years)
+ */
+export async function getHistoricalAnalysis(req, res) {
+  try {
+    const { lat, lon, start_year = 1990 } = req.query;
+    const end_date = new Date().toISOString().split('T')[0];
+    const start_date = `${start_year}-01-01`;
+
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start_date}&end_date=${end_date}&daily=temperature_2m_mean,precipitation_sum,humidity_2m_mean,wind_speed_10m_max&timezone=auto`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+
+    // Statistical Computations
+    const temps = data.daily.temperature_2m_mean.filter(t => t != null);
+    const n = temps.length;
+    
+    // Linear Regression for Trend
+    const xSum = (n * (n + 1)) / 2;
+    const ySum = temps.reduce((a, b) => a + b, 0);
+    const xySum = temps.reduce((sum, y, x) => sum + (x * y), 0);
+    const xSqSum = (n * (n + 1) * (2 * n + 1)) / 6;
+    const slope = (n * xySum - xSum * ySum) / (n * xSqSum - xSum * xSum);
+
+    // Anomaly Detection: Compare last 365 days to the long-term average
+    const totalRain = data.daily.precipitation_sum.reduce((a, b) => a + (b || 0), 0);
+    const avgAnnualRain = (totalRain / (n / 365));
+    const lastYearRain = data.daily.precipitation_sum.slice(-365).reduce((a, b) => a + (b || 0), 0);
+    const rainAnomaly = (((lastYearRain - avgAnnualRain) / avgAnnualRain) * 100).toFixed(1);
+
+    res.json({
+      raw: data.daily,
+      insights: {
+        tempTrend: (slope * n).toFixed(2),
+        isWarming: (slope * n) > 0,
+        avgPrecip: avgAnnualRain.toFixed(2),
+        rainAnomaly: rainAnomaly
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 }
 

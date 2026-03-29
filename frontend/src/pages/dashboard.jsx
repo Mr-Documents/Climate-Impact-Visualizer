@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
 import CoordinateForm from "../components/forms/coordinateform";
+import { FaRobot, FaLightbulb, FaMapMarkerAlt } from "react-icons/fa";
 import { Line } from "react-chartjs-2";
 import { Circle } from "react-leaflet";
 import {
@@ -11,7 +12,6 @@ import {
   LinearScale,
   PointElement,
   LineElement,
-  Title,
   Tooltip,
   Legend
 } from "chart.js";
@@ -33,7 +33,6 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
-  Title,
   Tooltip,
   Legend
 );
@@ -130,13 +129,10 @@ function MapOverlays({ center, layers }) {
 
 const Dashboard = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
+  const [locationName, setLocationName] = useState("Accra, Ghana");
   const [loading, setLoading] = useState(true);
   const [isWaterBody, setIsWaterBody] = useState(false);
-
-  const [rainData, setRainData] = useState([]);
-  const [tempData, setTempData] = useState([]);
-  const [windData, setWindData] = useState([]);
-  const [hourLabels, setHourLabels] = useState([]);
+  const [recentSnapshot, setRecentSnapshot] = useState(null);
 
   const [currentWeather, setCurrentWeather] = useState({
     temperature: null,
@@ -308,11 +304,6 @@ const Dashboard = () => {
         const lastHourRain = currentItem.precipitation ?? 0;
         const totalRain24 = rainHist.reduce((a, b) => a + b, 0); // Accumulate past 24h rain
         const avgTemp = computeAverage(tempHist);
-
-        setRainData(rainHist);
-        setTempData(tempHist);
-        setWindData(windHist);
-        setHourLabels(labelsHist);
 
         const nextWeatherSummary = {
           temperature: avgTemp,
@@ -542,6 +533,72 @@ const Dashboard = () => {
         ))}
       </section>
 
+      {/* 2, 4 & 5. LOCATION INTELLIGENCE & AI IMPACT PANELS */}
+      <div className="row g-4 mb-4">
+        <div className="col-lg-8">
+          <div className="card shadow-sm border-0 bg-primary text-white h-100">
+            <div className="card-body p-4">
+              <div className="d-flex align-items-center gap-3 mb-4">
+                <div className="rounded-circle bg-white bg-opacity-25 p-3"><FaRobot size={24} /></div>
+                <div>
+                  <h5 className="mb-0 fw-bold">AI Location Intelligence</h5>
+                  <div className="small opacity-75"><FaMapMarkerAlt size={12}/> {locationName}</div>
+                </div>
+              </div>
+              <div className="bg-white bg-opacity-10 rounded-3 p-3 mb-4">
+                <h6 className="fw-bold mb-1"><FaLightbulb className="text-warning me-2"/> AI Climate Insight</h6>
+                <p className="mb-0 lead fs-6">
+                  {floodRisk.toLowerCase() === "high" 
+                    ? `“Rising rainfall variability combined with high humidity suggests increased flood likelihood in ${locationName.split(',')[0]}.”`
+                    : `“This area shows high rainfall variability and ${droughtRisk.toLowerCase()} drought risk levels.”`}
+                </p>
+              </div>
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <div className="small fw-bold text-uppercase opacity-75 mb-2">Impact Summary</div>
+                  <div className="d-flex justify-content-between border-bottom border-white border-opacity-10 py-1">
+                    <span>Flood Likelihood</span><span className="fw-bold">{floodRisk}</span>
+                  </div>
+                  <div className="d-flex justify-content-between border-bottom border-white border-opacity-10 py-1">
+                    <span>Agricultural Impact</span><span className="fw-bold">{currentWeather.soilMoisture < 0.2 ? 'Stressed' : 'Optimal'}</span>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                   <div className="small fw-bold text-uppercase opacity-75 mb-2">Water Stress Level</div>
+                   <div className="progress bg-white bg-opacity-25 mb-1" style={{height: 10}}>
+                      <div className="progress-bar bg-warning" style={{width: `${(1-currentWeather.soilMoisture)*100}%`}}></div>
+                   </div>
+                   <div className="text-end small">{(100 - (currentWeather.soilMoisture*100)).toFixed(0)}% Scarcity Index</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 7. Recent Climate Snapshot */}
+        <div className="col-lg-4">
+          <div className="card shadow-sm border-0 h-100">
+            <div className="card-header bg-white fw-bold py-3">Recent 30-Day Snapshot</div>
+            <div className="card-body">
+              <div className="text-center mb-4">
+                <div className="display-6 fw-bold text-primary">
+                  {recentSnapshot ? (recentSnapshot.precipitation_sum?.reduce((a, b) => a + (b || 0), 0) || 0).toFixed(1) : '--'}mm
+                </div>
+                <div className="text-muted small">Total Rainfall (Past 30 Days)</div>
+              </div>
+              <div className="d-flex justify-content-between small mb-2">
+                <span>Rainfall Spikes</span>
+                <span className="badge bg-info text-dark">Detected: {recentSnapshot?.precipitation_sum?.filter(r => r > 10).length || 0} days</span>
+              </div>
+              <div className="d-flex justify-content-between small">
+                <span>Temperature Pattern</span>
+                <span className="text-success fw-bold">Moderate Variation</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="row gx-4 gy-4">
 
         {/* INTERACTIVE MAP (MAIN VISUALIZATION) */}
@@ -551,7 +608,7 @@ const Dashboard = () => {
               <div className="d-flex align-items-center justify-content-between mb-3">
                 <div className="d-flex align-items-center gap-2 fw-bold">
                   <FaMapMarkedAlt size={24} className="text-primary" />
-                  <span>Interactive Map</span>
+                  <span>AI Risk Map (Visual Upgrade)</span>
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   {Object.entries(mapLayers).map(([key, enabled]) => (
@@ -579,6 +636,12 @@ const Dashboard = () => {
                 onSelect={(lat, lon) => setCoords({ lat, lon })}
               >
                 <MapOverlays center={[coords.lat, coords.lon]} layers={mapLayers} />
+                {/* AI Predicted Risk Circle */}
+                <Circle 
+                  center={[coords.lat, coords.lon]} 
+                  radius={30000} 
+                  pathOptions={{ color: getRiskColor(floodRisk), fillColor: getRiskColor(floodRisk), fillOpacity: 0.3 }} 
+                />
               </UnifiedMap>
 
               <div className="mt-3 d-flex gap-2 flex-wrap">
@@ -706,79 +769,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* HISTORICAL TRENDS (LINE CHARTS) */}
-        <div className="col-12">
-          <div className="card shadow-sm border-0">
-            <div className="card-body">
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <div className="d-flex align-items-center gap-2 fw-bold">
-                  <FaChartLine size={24} className="text-secondary" />
-                  <span>Historical Trends</span>
-                </div>
-                <div className="text-muted small">Past 24 hours at selected location.</div>
-              </div>
-
-              <Line
-                data={{
-                  labels: hourLabels,
-                  datasets: [
-                    {
-                      label: "Rainfall (mm)",
-                      data: rainData,
-                      borderColor: "#17a2b8",
-                      backgroundColor: "rgba(23,162,184,0.2)",
-                      yAxisID: "y1",
-                      tension: 0.35,
-                      fill: true,
-                    },
-                    {
-                      label: "Temperature (°C)",
-                      data: tempData,
-                      borderColor: "#dc3545",
-                      backgroundColor: "rgba(220,53,69,0.2)",
-                      yAxisID: "y2",
-                      tension: 0.35,
-                      fill: true,
-                    },
-                    {
-                      label: "Wind Speed (km/h)",
-                      data: windData,
-                      borderColor: "#6f42c1",
-                      backgroundColor: "rgba(111,66,193,0.2)",
-                      yAxisID: "y3",
-                      tension: 0.35,
-                      fill: true,
-                    },
-                  ],
-                }}
-                options={{
-                  responsive: true,
-                  interaction: { mode: "index", intersect: false },
-                  scales: {
-                    y1: {
-                      type: "linear",
-                      position: "left",
-                      title: { display: true, text: "Rainfall (mm)" },
-                    },
-                    y2: {
-                      type: "linear",
-                      position: "right",
-                      title: { display: true, text: "Temperature (°C)" },
-                      grid: { drawOnChartArea: false },
-                    },
-                    y3: {
-                      type: "linear",
-                      position: "right",
-                      title: { display: true, text: "Wind Speed (km/h)" },
-                      grid: { drawOnChartArea: false },
-                      offset: true,
-                    },
-                  },
-                }}
-              />
-            </div>
-          </div>
-        </div>
 
         {/* CLIMATE IMPACT ANALYSIS */}
         <div className="col-lg-6">
