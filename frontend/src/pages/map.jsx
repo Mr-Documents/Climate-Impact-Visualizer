@@ -16,14 +16,14 @@ import {
   FaInfoCircle,
   FaDownload,
   FaHistory,
+  FaChartLine,
   FaChartArea,
   FaExclamationCircle,
-  FaArrowTrendUp,
   FaThermometerHalf
 } from "react-icons/fa";
 import ResultCard from "../components/reusable/resultcard"; 
 import { Circle, Popup, Marker, TileLayer } from "react-leaflet";
-import { Line, Bar } from "react-chartjs-2";
+import { Line, Bar, Scatter } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -33,7 +33,10 @@ import {
   BarElement,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  ScatterController,
+  LineController,
+  BarController
 } from "chart.js";
 import L from "leaflet";
 
@@ -46,7 +49,10 @@ ChartJS.register(
   BarElement,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  ScatterController,
+  LineController,
+  BarController
 );
 
 // --- Weather Overlay Configuration ---
@@ -93,8 +99,11 @@ const MapPage = () => {
   });
   const [activeOverlays, setActiveOverlays] = useState([]);
   const [historicalAnalysis, setHistoricalAnalysis] = useState(null);
+  const [histError, setHistError] = useState(null);
   const [histLoading, setHistLoading] = useState(false);
   const [locationName, setLocationName] = useState("");
+  const [startYear, setStartYear] = useState(1994); // 30 years ago approx
+  const [chartType, setChartType] = useState('line'); // 'line' or 'bar'
 
   const fetchAllClimateData = useCallback(async (lat, lon) => {
     setLoading(true);
@@ -129,13 +138,31 @@ const MapPage = () => {
     }
   }, []);
 
-  const fetchHistoricalDeepDive = useCallback(async (lat, lon) => {
+  const fetchHistoricalDeepDive = useCallback(async (lat, lon, year) => {
     setHistLoading(true);
+    setHistoricalAnalysis(null); // Reset to ensure loading state shows correctly
+    setHistError(null);
     try {
-      const res = await axios.get(`http://localhost:5000/api/historical-analysis?lat=${lat}&lon=${lon}&start_year=1990`);
-      setHistoricalAnalysis(res.data);
+      const res = await axios.get(`http://localhost:5000/api/historical-analysis?lat=${lat}&lon=${lon}&start_year=${year}`);
+      console.log("Historical Data Received:", res.data);
+      if (res.data && res.data.raw) {
+        setHistoricalAnalysis(res.data);
+      } else {
+        console.warn("Backend returned success but no 'raw' data field exists.");
+      }
     } catch (err) {
-      console.error("History fetch failed", err);
+      if (err.response?.status === 429) {
+        setHistError("Provider limit exceeded. Our data source needs a 60-second break. Please wait a moment.");
+        return;
+      }
+      if (err.response?.status === 404) {
+        const msg = "Route Not Found (404). Please ensure '/api/historical-analysis' is registered in your backend routes file.";
+        setHistError(msg);
+        console.error(msg);
+      } else {
+        const errMsg = err.response?.data?.error || err.response?.data?.reason || err.message;
+        setHistError(errMsg);
+      }
     } finally {
       setHistLoading(false);
     }
@@ -143,9 +170,9 @@ const MapPage = () => {
 
   useEffect(() => {
     fetchAllClimateData(coords.lat, coords.lon);
-    fetchHistoricalDeepDive(coords.lat, coords.lon);
+    fetchHistoricalDeepDive(coords.lat, coords.lon, startYear);
     fetchLocationName(coords.lat, coords.lon);
-  }, [coords.lat, coords.lon, fetchAllClimateData, fetchHistoricalDeepDive, fetchLocationName]);
+  }, [coords.lat, coords.lon, startYear, fetchAllClimateData, fetchHistoricalDeepDive, fetchLocationName]);
 
   const toggleOverlay = (key) => {
     setActiveOverlays((prev) => 
@@ -184,7 +211,7 @@ const MapPage = () => {
 
   // --- Analytical Computations ---
   const seasonalData = React.useMemo(() => {
-    if (!historicalAnalysis?.raw) return null;
+    if (!historicalAnalysis?.raw?.time) return null;
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const stats = Array(12).fill(0).map(() => ({ temp: 0, rain: 0, count: 0 }));
     
@@ -203,7 +230,7 @@ const MapPage = () => {
   }, [historicalAnalysis]);
 
   const extremeEvents = React.useMemo(() => {
-    if (!historicalAnalysis?.raw) return [];
+    if (!historicalAnalysis?.raw?.time) return [];
     // Detect precipitation > 95th percentile or Temp > 35
     return historicalAnalysis.raw.time
       .map((t, i) => ({ 
@@ -401,38 +428,57 @@ const MapPage = () => {
       {/* DEEP HISTORICAL ANALYSIS SECTION */}
       <div className="col-12 mt-4">
         <div className="card shadow-sm border-0 p-4">
-          <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 gap-3">
+          <div className="d-flex flex-column flex-md-row align-items-md-start justify-content-between mb-4 gap-3">
             <div>
               <h4 className="fw-bold mb-1"><FaHistory className="text-primary me-2"/> 30-Year Climate Evolution</h4>
-              <p className="text-muted small mb-0">Comprehensive time-series and anomaly detection for {locationName || 'Selected Area'}</p>
+              <p className="text-muted small mb-0">Visualizing environmental shifts and extreme events since {startYear}.</p>
             </div>
-            <button className="btn btn-outline-dark btn-sm" onClick={() => {
+            <div className="d-flex flex-wrap gap-2">
+              <select 
+                className="form-select form-select-sm w-auto" 
+                value={startYear} 
+                onChange={(e) => setStartYear(Number(e.target.value))}
+              >
+                {[...Array(31)].map((_, i) => (
+                  <option key={i} value={new Date().getFullYear() - 30 + i}>
+                    Since {new Date().getFullYear() - 30 + i}
+                  </option>
+                ))}
+              </select>
+              <button 
+                className="btn btn-outline-primary btn-sm"
+                onClick={() => setChartType(chartType === 'line' ? 'bar' : 'line')}
+              >
+                Switch to {chartType === 'line' ? 'Bar' : 'Line'}
+              </button>
+              <button className="btn btn-outline-dark btn-sm" onClick={() => {
                if (!historicalAnalysis) return;
-               const csv = "Date,Temp,Rain\n" + historicalAnalysis.raw.time.map((t,i) => `${t},${historicalAnalysis.raw.temperature_2m_mean[i]},${historicalAnalysis.raw.precipitation_sum[i]}`).join('\n');
+               const csv = "Date,Temp,Rain\n" + (historicalAnalysis.raw.time?.map((t,i) => `${t},${historicalAnalysis.raw.temperature_2m_mean?.[i] ?? ''},${historicalAnalysis.raw.precipitation_sum?.[i] ?? ''}`).join('\n') || "");
                const blob = new Blob([csv], { type: 'text/csv' });
                const url = URL.createObjectURL(blob);
                const link = document.createElement('a');
                link.href = url; link.download = `climate_history_${coords.lat}_${coords.lon}.csv`; link.click();
             }}> <FaDownload className="me-2"/> Export CSV Data</button>
+            </div>
           </div>
 
-          {histLoading ? <div className="text-center p-5"><div className="spinner-border text-primary"/></div> : historicalAnalysis && (
+          {histLoading ? <div className="text-center p-5"><div className="spinner-border text-primary"/><p className="mt-2 text-muted">Retrieving 30 years of climate history...</p></div> : historicalAnalysis?.raw ? (
             <div className="row g-4">
               <div className="col-md-4">
                  <div className="p-3 bg-light rounded border-top border-4 border-danger h-100">
                     <h6 className="fw-bold small text-uppercase text-secondary">Trend Analysis</h6>
-                    <div className="h3">+{historicalAnalysis.insights.tempTrend}°C</div>
+                    <div className="h3">+{historicalAnalysis.insights?.tempTrend ?? '0'}°C</div>
                     <p className="small text-danger mb-0 fw-bold mt-2">
-                      “Average temperature has increased by {historicalAnalysis.insights.tempTrend}°C over the last 30 years.”
+                      “Average temperature has increased by {historicalAnalysis.insights?.tempTrend ?? '0'}°C over the last 30 years.”
                     </p>
                  </div>
               </div>
               <div className="col-md-4">
                  <div className="p-3 bg-light rounded border-top border-4 border-info h-100">
                     <h6 className="fw-bold small text-uppercase text-secondary">Anomaly Detection</h6>
-                    <div className="h3">{historicalAnalysis.insights.rainAnomaly}%</div>
+                    <div className="h3">{historicalAnalysis.insights?.rainAnomaly ?? '0'}%</div>
                     <p className="small text-info mb-0 fw-bold mt-2">
-                      “Recent rainfall is {historicalAnalysis.insights.rainAnomaly}% {historicalAnalysis.insights.rainAnomaly > 0 ? 'above' : 'below'} the 30-year average.”
+                      “Recent rainfall is {historicalAnalysis.insights?.rainAnomaly ?? '0'}% {historicalAnalysis.insights?.rainAnomaly > 0 ? 'above' : 'below'} the 30-year average.”
                     </p>
                  </div>
               </div>
@@ -442,23 +488,23 @@ const MapPage = () => {
                     <p className="small mb-0 mt-2">Increasing rainfall variability in {locationName || 'this region'} directly influences our flood and drought risk models.</p>
                  </div>
               </div>
-              <div className="col-12 d-flex flex-column gap-4">
+              <div className="col-12 d-flex flex-column gap-5">
                    <div className="bg-light p-4 rounded shadow-sm border w-100">
                       <h6 className="fw-bold mb-4 d-flex align-items-center gap-2">
                         <FaChartArea className="text-primary"/> 1. Key Climate Variables Over Time (1990-2024)
                       </h6>
-                      <Line 
+                      {chartType === 'line' ? <Line 
                         data={{
-                          labels: historicalAnalysis.raw.time.filter((_, i) => i % 365 === 0).map(t => t.split('-')[0]),
+                          labels: historicalAnalysis.raw.time?.filter((_, i) => i % 365 === 0).map(t => t.split('-')[0]) || [],
                           datasets: [
                             { 
                               label: "Temp (°C)", 
-                              data: historicalAnalysis.raw.temperature_2m_mean.filter((_, i) => i % 365 === 0), 
+                              data: historicalAnalysis.raw.temperature_2m_mean?.filter((_, i) => i % 365 === 0) || [], 
                               borderColor: "#dc3545", yAxisID: 'y', tension: 0.3
                             },
                             { 
                               label: "Rain (mm)", 
-                              data: historicalAnalysis.raw.precipitation_sum.filter((_, i) => i % 365 === 0), 
+                              data: historicalAnalysis.raw.precipitation_sum?.filter((_, i) => i % 365 === 0) || [], 
                               backgroundColor: "rgba(13, 110, 253, 0.1)", borderColor: "#0d6efd", fill: true, yAxisID: 'y1', tension: 0.3
                             },
                             {
@@ -475,10 +521,33 @@ const MapPage = () => {
                             y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Rain (mm)' } }
                           }
                         }}
-                      />
+                      /> : <Bar 
+                        data={{
+                          labels: historicalAnalysis.raw.time?.filter((_, i) => i % 365 === 0).map(t => t.split('-')[0]) || [],
+                          datasets: [
+                            { 
+                              label: "Avg Temp (°C)", 
+                              data: historicalAnalysis.raw.temperature_2m_mean?.filter((_, i) => i % 365 === 0) || [], 
+                              backgroundColor: "rgba(220, 53, 69, 0.7)", yAxisID: 'y'
+                            },
+                            { 
+                              label: "Rain (mm)", 
+                              data: historicalAnalysis.raw.precipitation_sum?.filter((_, i) => i % 365 === 0) || [], 
+                              backgroundColor: "rgba(13, 110, 253, 0.7)", yAxisID: 'y1'
+                            }
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          scales: {
+                            y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp' } },
+                            y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Rain (mm)' } }
+                          }
+                        }}
+                      />}
                    </div>
 
-                  <div className="bg-light p-4 rounded shadow-sm border text-center w-100">
+                  {seasonalData && <div className="bg-light p-4 rounded shadow-sm border text-center w-100">
                     <h6 className="fw-bold mb-4 d-flex align-items-center justify-content-center gap-2">
                       <FaGlobe className="text-success"/> 4. Seasonal Patterns (Monthly Averages)
                     </h6>
@@ -493,6 +562,42 @@ const MapPage = () => {
                     />
                     <div className="mt-3 p-2 bg-white border rounded small">
                       <strong>Insight:</strong> The data confirms a distinct {seasonalData.rain[5] > seasonalData.rain[0] ? 'Summer' : 'Winter'} wet season for this coordinate.
+                    </div>
+                  </div>}
+
+                  <div className="row g-4">
+                    <div className="col-lg-6">
+                      <div className="bg-light p-4 rounded shadow-sm border h-100">
+                        <h6 className="fw-bold mb-4 d-flex align-items-center gap-2">
+                          <FaChartArea className="text-warning"/> 5. Correlation: Temp vs Rainfall
+                        </h6>
+                        <Scatter 
+                          data={{
+                            datasets: [{
+                              label: 'Climate Correlation',
+                              data: historicalAnalysis.raw.temperature_2m_mean?.filter((_, i) => i % 30 === 0).map((temp, i) => ({
+                                x: temp,
+                                y: historicalAnalysis.raw.precipitation_sum?.filter((_, j) => j % 30 === 0)[i] || 0
+                              })),
+                              backgroundColor: 'rgba(102, 16, 242, 0.6)'
+                            }]
+                          }}
+                          options={{
+                            scales: {
+                              x: { title: { display: true, text: 'Mean Temperature (°C)' } },
+                              y: { title: { display: true, text: 'Daily Rainfall (mm)' } }
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="col-lg-6">
+                      <div className="p-4 rounded shadow-sm border h-100 bg-white d-flex flex-column justify-content-center">
+                        <h5 className="fw-bold text-primary mb-3"><FaChartLine className="me-2"/> Trend Summary Card</h5>
+                        <div className="display-6 fw-bold mb-2">+{historicalAnalysis.insights?.tempTrend ?? '0'}°C</div>
+                        <p className="text-muted">Over the last {new Date().getFullYear() - startYear} years, {locationName.split(',')[0]} has seen a persistent warming trend. Rainfall anomalies of {historicalAnalysis.insights?.rainAnomaly ?? '0'}% suggest {Math.abs(historicalAnalysis.insights?.rainAnomaly ?? 0) > 10 ? 'significant' : 'minor'} deviation from 20th-century norms.</p>
+                        <div className="badge bg-soft-primary text-primary p-2 align-self-start">Anomaly Detected: {historicalAnalysis.insights?.rainAnomaly ?? '0'}%</div>
+                      </div>
                     </div>
                   </div>
 
@@ -534,14 +639,30 @@ const MapPage = () => {
                   </div>
                   <div className="col-md-6">
                     <div className="p-3 border rounded bg-white shadow-sm h-100">
-                      <h6 className="fw-bold small text-uppercase mb-2 text-success">8. ML Training Feedback</h6>
+                      <h6 className="fw-bold small text-uppercase mb-2 text-success">Link to ML Predictions</h6>
                       <p className="small mb-0">
-                        The <strong>Linear Trend (Slope: {historicalAnalysis.insights.tempTrend})</strong> calculated here acts as a primary feature for our predictive model's baseline adjustment.
+                        The <strong>Linear Trend (Slope: {historicalAnalysis.insights?.tempTrend ?? '0'})</strong> calculated here acts as a primary feature for our predictive model's baseline adjustment.
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="text-center p-5 border rounded bg-light">
+              {histError ? (
+                <>
+                  <FaExclamationCircle className="text-danger mb-3" size={40} />
+                  <h5 className="text-danger">Failed to Load History</h5>
+                  <p className="text-muted">Error: {histError}</p>
+                </>
+              ) : (
+                <>
+                  <FaInfoCircle className="text-muted mb-3" size={40} />
+                  <h5>No Historical Data Available</h5>
+                  <p className="text-muted">Ensure the backend is running and coordinates are over land. Try selecting a different location on the map.</p>
+                </>
+              )}
             </div>
           )}
         </div>

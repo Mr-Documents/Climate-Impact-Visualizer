@@ -2,6 +2,10 @@
 import fetch from 'node-fetch';
 import { predictClimateRisk } from '../prediction.js';
 
+// In-memory cache for historical analysis to prevent API rate limiting
+const historicalCache = new Map();
+const CACHE_LIMIT = 100; // Keep last 100 locations
+
 /**
  * Handles /api/predict requests with live Open-Meteo weather data
  * Expects: { latitude, longitude }
@@ -153,40 +157,97 @@ export async function predictClimate(req, res) {
 export async function getHistoricalAnalysis(req, res) {
   try {
     const { lat, lon, start_year = 1990 } = req.query;
-    const end_date = new Date().toISOString().split('T')[0];
+    
+    if (!lat || !lon) {
+      return res.status(400).json({ error: "Latitude and Longitude are required." });
+    }
+
+    // 1. Define the cache key and check for existing data
+    const cacheKey = `${Number(lat).toFixed(2)}_${Number(lon).toFixed(2)}_${start_year}`;
+    if (historicalCache.has(cacheKey)) {
+      console.log(`[Cache Hit] Serving historical data for ${cacheKey}`);
+      return res.json(historicalCache.get(cacheKey));
+    }
+
+    // Open-Meteo Archive lag: Set end_date to 5 days ago to ensure data availability
+    const date = new Date();
+    date.setDate(date.getDate() - 5);
+    const end_date = date.toISOString().split('T')[0];
     const start_date = `${start_year}-01-01`;
 
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start_date}&end_date=${end_date}&daily=temperature_2m_mean,precipitation_sum,humidity_2m_mean,wind_speed_10m_max&timezone=auto`;
+    // Corrected parameter: relative_humidity_2m_mean
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start_date}&end_date=${end_date}&daily=temperature_2m_mean,precipitation_sum,relative_humidity_2m_mean&timezone=auto`;
     
     const response = await fetch(url);
     const data = await response.json();
 
+    // Handle API Rate Limiting specifically
+    if (data.error && (data.reason?.includes("limit") || response.status === 429)) {
+      return res.status(429).json({ 
+        error: "API Limit Reached", 
+        reason: "The weather provider is currently busy. Please wait 60 seconds before requesting new historical data." 
+      });
+    }
+
+    if (data.error || !data.daily || !data.daily.temperature_2m_mean) {
+      console.error("Open-Meteo Archive Error:", data.reason || "Invalid coordinates or missing data");
+      return res.status(400).json({ 
+        error: "Historical data not found", 
+        reason: data.reason || "The weather archive is unavailable for this specific coordinate/year range." 
+      });
+    }
+
     // Statistical Computations
-    const temps = data.daily.temperature_2m_mean.filter(t => t != null);
+    // Filter out nulls to ensure valid regression
+    const temps = data.daily.temperature_2m_mean.filter(t => t !== null);
     const n = temps.length;
     
-    // Linear Regression for Trend
-    const xSum = (n * (n + 1)) / 2;
-    const ySum = temps.reduce((a, b) => a + b, 0);
-    const xySum = temps.reduce((sum, y, x) => sum + (x * y), 0);
-    const xSqSum = (n * (n + 1) * (2 * n + 1)) / 6;
-    const slope = (n * xySum - xSum * ySum) / (n * xSqSum - xSum * xSum);
+    if (n < 2) {
+      return res.status(404).json({ error: "No data points found for this range." });
+    }
+    
+    // Linear Regression for Trend (Using index 0...n-1 as X)
+    let xSum = 0, ySum = 0, xySum = 0, xSqSum = 0;
+    for (let i = 0; i < n; i++) {
+      xSum += i;
+      ySum += temps[i];
+      xySum += i * temps[i];
+      xSqSum += i * i;
+    }
+    const denominator = (n * xSqSum - xSum * xSum);
+    const slope = denominator !== 0 ? (n * xySum - xSum * ySum) / denominator : 0;
 
     // Anomaly Detection: Compare last 365 days to the long-term average
-    const totalRain = data.daily.precipitation_sum.reduce((a, b) => a + (b || 0), 0);
-    const avgAnnualRain = (totalRain / (n / 365));
-    const lastYearRain = data.daily.precipitation_sum.slice(-365).reduce((a, b) => a + (b || 0), 0);
-    const rainAnomaly = (((lastYearRain - avgAnnualRain) / avgAnnualRain) * 100).toFixed(1);
+    const rainData = data.daily.precipitation_sum || [];
+    const totalRain = rainData.reduce((a, b) => a + (b || 0), 0);
+    const yearsCount = Math.max(1, n / 365);
+    const avgAnnualRain = (totalRain / yearsCount);
+    const lastYearRain = rainData.slice(-365).reduce((a, b) => a + (b || 0), 0);
+    
+    // Prevent division by zero if avgAnnualRain is 0
+    const rainAnomaly = avgAnnualRain > 0 ? (((lastYearRain - avgAnnualRain) / avgAnnualRain) * 100).toFixed(1) : "0.0";
 
-    res.json({
-      raw: data.daily,
+    const result = {
+      raw: {
+        ...data.daily,
+        humidity_2m_mean: data.daily.relative_humidity_2m_mean || Array(n).fill(null)
+      },
       insights: {
         tempTrend: (slope * n).toFixed(2),
         isWarming: (slope * n) > 0,
         avgPrecip: avgAnnualRain.toFixed(2),
         rainAnomaly: rainAnomaly
       }
-    });
+    };
+
+    // Store in cache before returning
+    if (historicalCache.size >= CACHE_LIMIT) {
+      const firstKey = historicalCache.keys().next().value;
+      historicalCache.delete(firstKey);
+    }
+    historicalCache.set(cacheKey, result);
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

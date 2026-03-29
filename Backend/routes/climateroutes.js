@@ -4,7 +4,7 @@ import { getWeatherData } from '../controllers/weathercontroller.js';
 import { getPrecipitationSoil } from '../controllers/precipitationcontroller.js';
 import { getCloudSolar } from '../controllers/cloudsolarcontroller.js';
 import { getFloodRisk } from '../controllers/floodriskcontroller.js';
-import { predictClimate } from '../controllers/climatepredictcontroller.js';
+import { predictClimate, getHistoricalAnalysis } from '../controllers/climatepredictcontroller.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -110,5 +110,6 @@ router.get('/precipitation', getPrecipitationSoil);
 router.get('/cloudsolar', getCloudSolar);
 router.get('/floodrisk', getFloodRisk);    
 router.post('/predict', predictClimate);      
+router.get('/historical-analysis', getHistoricalAnalysis);
 
 export default router;
