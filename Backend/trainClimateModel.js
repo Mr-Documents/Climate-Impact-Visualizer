@@ -229,18 +229,24 @@ async function trainModel(featuresTensor, labelsTensor, modelName) {
   const model = createLSTMModel(featuresNorm.shape[1]);
 
   console.log(`\n[RE-TRAINING] Starting fresh training for ${modelName} using the combined dataset...`);
+  const savePath = path.join(__dirname, `saved_model_${modelName}`);
+
   await model.fit(xTrain, yTrain, {
     epochs: EPOCHS,
     batchSize: BATCH_SIZE,
     validationData: [xVal, yVal],
     callbacks: {
-      onEpochEnd: (epoch, logs) => {
+      onEpochEnd: async (epoch, logs) => {
         console.log(`[${modelName}] Epoch ${epoch+1}/${EPOCHS} - loss: ${logs.loss.toFixed(4)} - acc: ${logs.acc.toFixed(4)} - val_loss: ${logs.val_loss.toFixed(4)} - val_acc: ${logs.val_acc.toFixed(4)}`);
+        
+        // Save a checkpoint every 5 epochs so progress isn't lost if the script crashes
+        if ((epoch + 1) % 5 === 0) {
+          await saveModelToDisk(model, savePath);
+          console.log(` -> Checkpoint: ${modelName} model updated on disk at epoch ${epoch + 1}`);
+        }
       }
     }
   });
-
-  const savePath = path.join(__dirname, `saved_model_${modelName}`);
   await saveModelToDisk(model, savePath);
   console.log(`${modelName} model saved at: ${savePath}`);
 
