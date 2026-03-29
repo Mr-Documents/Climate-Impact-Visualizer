@@ -227,6 +227,30 @@ export async function getHistoricalAnalysis(req, res) {
     // Prevent division by zero if avgAnnualRain is 0
     const rainAnomaly = avgAnnualRain > 0 ? (((lastYearRain - avgAnnualRain) / avgAnnualRain) * 100).toFixed(1) : "0.0";
 
+    // --- Drought Index Calculation (Approximated SPI) ---
+    // Aggregate precipitation by year
+    const yearlyRain = {};
+    data.daily.time.forEach((t, i) => {
+      const year = t.split('-')[0];
+      yearlyRain[year] = (yearlyRain[year] || 0) + (data.daily.precipitation_sum[i] || 0);
+    });
+
+    const years = Object.keys(yearlyRain);
+    const rainValues = Object.values(yearlyRain);
+    const meanRain = rainValues.reduce((a, b) => a + b, 0) / rainValues.length;
+    const stdDevRain = Math.sqrt(rainValues.reduce((s, v) => s + Math.pow(v - meanRain, 2), 0) / rainValues.length);
+
+    const droughtIndexSeries = years.map(year => {
+      const val = yearlyRain[year];
+      // SPI Formula: (Value - Mean) / StdDev
+      const spi = stdDevRain > 0 ? (val - meanRain) / stdDevRain : 0;
+      return {
+        year,
+        spi: Number(spi.toFixed(2)),
+        totalRain: Number(val.toFixed(1))
+      };
+    });
+
     const result = {
       raw: {
         ...data.daily,
@@ -236,7 +260,8 @@ export async function getHistoricalAnalysis(req, res) {
         tempTrend: (slope * n).toFixed(2),
         isWarming: (slope * n) > 0,
         avgPrecip: avgAnnualRain.toFixed(2),
-        rainAnomaly: rainAnomaly
+        rainAnomaly: rainAnomaly,
+        droughtSeries: droughtIndexSeries
       }
     };
 

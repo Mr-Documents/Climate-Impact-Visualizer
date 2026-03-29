@@ -547,6 +547,37 @@ const MapPage = () => {
                       />}
                    </div>
 
+                  <div className="bg-light p-4 rounded shadow-sm border w-100">
+                    <h6 className="fw-bold mb-4 d-flex align-items-center gap-2">
+                      <FaChartArea className="text-warning"/> 2. Drought Intensity Index (SPI Approximation)
+                    </h6>
+                    <div style={{ height: '300px' }}>
+                      <Bar 
+                        data={{
+                          labels: historicalAnalysis.insights.droughtSeries?.map(d => d.year),
+                          datasets: [{
+                            label: 'Standardized Precipitation Index (SPI)',
+                            data: historicalAnalysis.insights.droughtSeries?.map(d => d.spi),
+                            backgroundColor: historicalAnalysis.insights.droughtSeries?.map(d => d.spi < 0 ? 'rgba(220, 53, 69, 0.7)' : 'rgba(13, 110, 253, 0.7)'),
+                            borderColor: historicalAnalysis.insights.droughtSeries?.map(d => d.spi < 0 ? '#dc3545' : '#0d6efd'),
+                            borderWidth: 1
+                          }]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          scales: {
+                            y: { title: { display: true, text: 'SPI Value (Std Deviations)' }, min: -3, max: 3 }
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="mt-3 p-3 bg-white border rounded small text-muted">
+                      <strong>How to read:</strong> Values below <strong>-1.0</strong> indicate moderate drought, while values below <strong>-2.0</strong> represent extreme drought. 
+                      Positive values indicate wetter-than-average years. This index helps identify multi-year dry spells.
+                    </div>
+                  </div>
+
                   {seasonalData && <div className="bg-light p-4 rounded shadow-sm border text-center w-100">
                     <h6 className="fw-bold mb-4 d-flex align-items-center justify-content-center gap-2">
                       <FaGlobe className="text-success"/> 4. Seasonal Patterns (Monthly Averages)
