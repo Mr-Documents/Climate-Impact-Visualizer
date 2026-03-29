@@ -62,10 +62,10 @@ const PredictionsPage = () => {
           color="info"
         >
           <p>
-            <strong>Flood risk:</strong> {prediction.flood?.label ?? "N/A"} ({(prediction.flood?.score ?? 0) * 100}%).
+            <strong>Flood risk:</strong> {prediction.flood?.label ?? "N/A"}.
           </p>
           <p>
-            <strong>Drought risk:</strong> {prediction.drought?.label ?? "N/A"} ({(prediction.drought?.score ?? 0) * 100}%).
+            <strong>Drought risk:</strong> {prediction.drought?.label ?? "N/A"}.
           </p>
           <p>
             <strong>Coordinates:</strong> {coords.lat}, {coords.lon}

@@ -170,13 +170,9 @@ const DroughtRiskPage = () => {
                 color={getRiskColor(droughtPrediction?.label)}
               >
                 <div className="row text-center">
-                  <div className="col-6">
+                  <div className="col-12">
                     <h3 className={`text-${getRiskColor(droughtPrediction?.label || '--')}`}>{droughtPrediction?.label || '--'}</h3>
                     <small className="text-muted">Risk Level</small>
-                  </div>
-                  <div className="col-6">
-                    <h3>{isWater || droughtPrediction?.label === '--' ? '--' : `${(droughtPrediction?.score * 100).toFixed(1)}%`}</h3>
-                    <small className="text-muted">Confidence Score</small>
                   </div>
                 </div>
                 <hr />

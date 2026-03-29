@@ -49,15 +49,6 @@ const humanizeRisk = (label) => {
   return label;
 };
 
-const riskToPercent = (label) => {
-  if (label === "--") return 0;
-  const normalized = label?.toString().toLowerCase?.();
-  if (normalized === "high") return 0.85;
-  if (normalized === "medium") return 0.55;
-  if (normalized === "low") return 0.25;
-  return 0.1;
-};
-
 const getRiskColor = (risk) => {
   switch (risk.toString().toLowerCase()) {
     case "high":
@@ -82,38 +73,17 @@ const computeAverage = (arr) => {
   return filtered.reduce((sum, v) => sum + v, 0) / filtered.length;
 };
 
-function RiskGauge({ label, value = 0, icon, title }) {
-  const pct = Math.min(1, Math.max(0, value));
+function RiskGauge({ label, icon, title }) {
   const color = getRiskColor(label);
-  const isInvalid = label === "--" || label === "N/A";
 
   return (
     <div className="card shadow-sm border-0 p-3">
-      <div className="d-flex align-items-start justify-content-between">
-        <div>
-          <div className="d-flex align-items-center gap-2 fw-bold">
-            {icon}
-            <span className="small text-uppercase text-secondary">{title}</span>
-          </div>
-          <div className="fs-4 fw-bold" style={{ color }}>{humanizeRisk(label)}</div>
-        </div>
-        <div className="d-flex align-items-center justify-content-center" style={{ width: 60, height: 60 }}>
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: "50%",
-              background: `conic-gradient(${color} 0% ${Math.round(pct * 100)}%, rgba(0,0,0,0.08) ${Math.round(pct * 100)}% 100%)`,
-              display: "grid",
-              placeItems: "center",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#343a40"
-            }}
-          >
-            {isInvalid ? "--" : `${Math.round(pct * 100)}%`}
-          </div>
-        </div>
+      <div className="d-flex align-items-center gap-2 fw-bold">
+        {icon}
+        <span className="small text-uppercase text-secondary">{title}</span>
+      </div>
+      <div className="fs-4 fw-bold" style={{ color }}>
+        {humanizeRisk(label)}
       </div>
     </div>
   );
@@ -626,19 +596,16 @@ const Dashboard = () => {
           <RiskGauge
             title="Flood Risk"
             label={floodRisk}
-            value={riskToPercent(floodRisk)}
             icon={<FaWater size={22} className="text-primary" />}
           />
           <RiskGauge
             title="Drought Severity"
             label={droughtRisk}
-            value={riskToPercent(droughtRisk)}
             icon={<FaCloudSun size={22} className="text-warning" />}
           />
           <RiskGauge
             title="Heatwave Potential"
             label={currentWeather.temperature > 32 ? "High" : currentWeather.temperature > 25 ? "Medium" : "Low"}
-            value={currentWeather.temperature ? Math.min(1, Math.max(0, (currentWeather.temperature - 15) / 30)) : 0}
             icon={<FaTemperatureHigh size={22} className="text-danger" />}
           />
         </div>
@@ -718,9 +685,6 @@ const Dashboard = () => {
                     <div className="card-body">
                       <h6 className="fw-bold">Predicted Flood Probability</h6>
                       <div className="d-flex align-items-center gap-3">
-                        <div className="fs-2 fw-bold" style={{ color: getRiskColor(floodRisk) }}>
-                          {isWaterBody ? "--" : `${(predictions.floodProbability * 100).toFixed(0)}%`}
-                        </div>
                         <div className="text-muted small">Based on current rainfall, soil moisture and wind conditions.</div>
                       </div>
                     </div>
@@ -731,9 +695,6 @@ const Dashboard = () => {
                     <div className="card-body">
                       <h6 className="fw-bold">Predicted Drought Risk</h6>
                       <div className="d-flex align-items-center gap-3">
-                        <div className="fs-2 fw-bold" style={{ color: getRiskColor(droughtRisk) }}>
-                          {isWaterBody ? "--" : `${(predictions.droughtProbability * 100).toFixed(0)}%`}
-                        </div>
                         <div className="text-muted small">Model scores are derived from current temperature, humidity and soil moisture.</div>
                       </div>
                     </div>
