@@ -20,6 +20,9 @@ export const getWeatherData = async (req, res) => {
 
     const { hourly } = response.data;
 
+    // Robust water detection: Check for absence of valid land-surface data
+    const isWater = !(hourly.soil_moisture_0_1cm || []).some(v => v !== null && v !== undefined && v !== 0);
+
     // Safely map series if the API returns expected arrays
     const series = (hourly?.time || []).map((time, i) => ({
       time,
@@ -29,11 +32,11 @@ export const getWeatherData = async (req, res) => {
       windSpeed: hourly.wind_speed_10m?.[i] ?? null,
       windDirection: hourly.wind_direction_10m?.[i] ?? null,
       cloudCover: hourly.cloudcover?.[i] ?? null,
-      soilMoisture: hourly.soil_moisture_0_1cm?.[i] ?? null,
-      soilTemperature: hourly.soil_temperature_0cm?.[i] ?? null,
+      soilMoisture: isWater ? null : (hourly.soil_moisture_0_1cm?.[i] ?? null),
+      soilTemperature: isWater ? null : (hourly.soil_temperature_0cm?.[i] ?? null),
     }));
 
-    res.json({ location: { lat: safeLat, lon: safeLon }, series });
+    res.json({ location: { lat: safeLat, lon: safeLon }, series, isWater });
   } catch (error) {
     console.error('Weather fetch error:', error.response?.status, error.response?.data || error.message);
     res.status(500).json({ error: 'Failed to fetch weather data' });

@@ -90,7 +90,7 @@ const DroughtRiskPage = () => {
   const isWater = data?.isWater || false;
   const rawPrediction = data?.prediction?.drought;
   const droughtPrediction = isWater 
-    ? { label: '--', score: 0 } 
+    ? { label: 'N/A', score: 0 } 
     : rawPrediction;
     
   const weather = data?.weather;
@@ -135,7 +135,7 @@ const DroughtRiskPage = () => {
   };
 
   const getInsight = (label) => {
-    if (label === '--') return "Analysis Unavailable: The selected location is identified as a water body or non-terrestrial surface. Drought risk assessment is not applicable.";
+    if (label === 'N/A' || label === '--') return "Analysis Unavailable: The selected location is identified as a water body. Drought risk assessment requires terrestrial soil metrics.";
     if (label === 'High') return "Severe moisture deficit detected. High temperatures combined with critically low soil moisture suggest vegetation stress and water scarcity risks.";
     if (label === 'Medium') return "Developing dry conditions. Soil moisture levels are declining relative to the current temperature. Monitor local water resources.";
     return "Hydrological conditions are healthy. Soil moisture and humidity levels are sufficient to sustain typical vegetation.";
@@ -213,15 +213,15 @@ const DroughtRiskPage = () => {
                 <div className="row mt-3">
                   <div className="col-4">
                     <strong>Temperature</strong><br />
-                    {weather.temperature} °C
+                    {isWater ? "--" : weather?.temperature ?? "--"} °C
                   </div>
                   <div className="col-4">
                     <strong>Humidity</strong><br />
-                    {weather.humidity != null ? `${weather.humidity.toFixed(0)}%` : '--'}
+                    {isWater ? "--" : (weather?.humidity != null ? `${weather.humidity.toFixed(0)}%` : '--')}
                   </div>
                   <div className="col-4">
                     <strong>Soil Moisture</strong><br />
-                    {weather.soilMoisture ?? '--'} m³/m³
+                    {isWater ? "--" : weather?.soilMoisture ?? '--'} m³/m³
                   </div>
                 </div>
               </ResultCard>

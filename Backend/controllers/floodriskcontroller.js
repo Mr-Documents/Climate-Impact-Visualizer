@@ -13,6 +13,19 @@ export const getFloodRisk = async (req, res) => {
     const response = await axios.get(url);
     const { hourly } = response.data;
 
+    // 1. Detect if location is a water body before any risk calculation
+    const hourlySoil = hourly?.soil_moisture_0_1cm || [];
+    const isWater = !hourlySoil.some(v => v !== null && v !== undefined && v !== 0);
+
+    if (isWater) {
+      return res.json({
+        inputs: { precipitation: null, soilMoisture: null, windSpeed: null },
+        floodRisk: "N/A",
+        score: 0,
+        isWater: true
+      });
+    }
+
     if (!hourly || !hourly.time?.length) {
       return res.status(500).json({ error: "Missing climate data from API" });
     }

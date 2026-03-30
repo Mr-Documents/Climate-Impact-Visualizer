@@ -41,15 +41,13 @@ export async function predictClimate(req, res) {
     const windSpeed = current.wind_speed_10m || 0;
     const temperature = current.temperature_2m || 25;
     
-    // Check for water body (Open-Meteo returns null for soil moisture over water in hourly data)
-    let soilMoisture = current.soil_moisture_0_1cm;
+    // Robust water detection: If soil moisture is entirely null or strictly zero across the series, treat as water/invalid.
     const hourlySoil = data.hourly?.soil_moisture_0_1cm || [];
-    
-    // Consider it water if current is null, OR if valid hourly readings are non-existent (all nulls)
-    const hasValidHistory = hourlySoil.some(v => v !== null && v !== undefined);
-    const isWater = (soilMoisture === null || soilMoisture === undefined) || !hasValidHistory;
+    const isWater = !hourlySoil.some(v => v !== null && v !== undefined && v !== 0);
 
-    if (isWater) soilMoisture = 0; // Default for calculation safety, but prediction will be skipped
+    let soilMoisture = current.soil_moisture_0_1cm;
+    // Default for safety if terrestrial, but flag ensures prediction is bypassed if water
+    if (isWater) soilMoisture = 0; 
 
     const humidity = current.relative_humidity_2m || 60;
 
@@ -129,7 +127,7 @@ export async function predictClimate(req, res) {
 
     // Call the updated prediction function (flood + drought)
     // Default to '--' if water/invalid so frontend treats it as invalid data
-    let prediction = { drought: { score: 0, label: '--' }, flood: { score: 0, label: '--' } };
+    let prediction = { drought: { score: 0, label: 'N/A' }, flood: { score: 0, label: 'N/A' } };
     
     if (!isWater) {
       prediction = await predictClimateRisk(featuresSequence);
@@ -138,7 +136,13 @@ export async function predictClimate(req, res) {
     res.json({
       location: { latitude, longitude },
       locationName,
-      weather: { precipitation, soilMoisture: isWater ? null : soilMoisture, windSpeed, temperature, humidity },
+      weather: { 
+        precipitation: precipitation, 
+        soilMoisture: isWater ? null : soilMoisture, 
+        windSpeed: windSpeed, 
+        temperature: temperature, 
+        humidity: humidity 
+      },
       history: historyData,
       recentSnapshot: snapshotData.daily,
       prediction, // contains { drought: { score, label }, flood: { score, label } }

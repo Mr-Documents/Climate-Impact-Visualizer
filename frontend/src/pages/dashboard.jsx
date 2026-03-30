@@ -40,8 +40,8 @@ ChartJS.register(
 
 // ----- Helpers -----
 const humanizeRisk = (label) => {
-  if (!label || label === "N/A") return "--";
   if (label === "--") return "--";
+  if (!label || label === "N/A") return "N/A";
   const normalized = label.toString().toLowerCase();
   if (normalized === "high") return "High";
   if (normalized === "medium") return "Medium";
@@ -388,8 +388,8 @@ const Dashboard = () => {
 
         if (isWater) {
           setLocationError("Selected location appears to be a water body or ice area. Soil-based predictions are invalid/unavailable.");
-          floodLabel = "--";
-          droughtLabel = "--";
+          floodLabel = "N/A";
+          droughtLabel = "N/A";
           floodSc = 0;
           droughtSc = 0;
         } else {
@@ -443,7 +443,7 @@ const Dashboard = () => {
     },
     {
       label: "Soil Moisture",
-      value: formatPercent(currentWeather.soilMoisture),
+      value: isWaterBody ? "N/A" : formatPercent(currentWeather.soilMoisture),
       icon: <FaTint size={22} className="text-primary" />,
       caption: "Topsoil 0-1cm",
     },
@@ -537,32 +537,44 @@ const Dashboard = () => {
                 <span className="text-uppercase fw-bold ls-1 small">Resilience Framework</span>
               </div>
               <h3 className="h4 fw-bold mb-3">Strategic Adaptation & Mitigation</h3>
-              <p className="text-muted mb-4">
-                Based on current AI diagnostics for <span className="text-dark fw-semibold">{locationName.split(',')[0]}</span>, 
-                the following professional mitigation strategies are recommended to enhance regional climate resilience.
-              </p>
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <div className="p-3 bg-light rounded-3 border-start border-4 border-primary">
-                    <h6 className="fw-bold mb-1 small">Infrastructure Prep</h6>
-                    <p className="small text-muted mb-0">
-                      {floodRisk.toLowerCase() === "high" 
-                        ? "Prioritize clearing of drainage channels and secondary waterway inspection." 
-                        : "Schedule maintenance for water storage and irrigation distribution systems."}
-                    </p>
-                  </div>
+              {isWaterBody ? (
+                <div className="p-4 bg-light rounded-4 border">
+                  <h5 className="h6 fw-bold text-secondary text-uppercase mb-2">Maritime Coordinate Detected</h5>
+                  <p className="text-muted mb-0">
+                    Standard terrestrial adaptation strategies (drainage, irrigation, soil management) are not applicable for water bodies. 
+                    Please select a land-based coordinate for localized mitigation insights.
+                  </p>
                 </div>
-                <div className="col-md-6">
-                  <div className="p-3 bg-light rounded-3 border-start border-4 border-success">
-                    <h6 className="fw-bold mb-1 small">Resource Allocation</h6>
-                    <p className="small text-muted mb-0">
-                      {droughtRisk.toLowerCase() === "high"
-                        ? "Activate emergency water conservation protocols and reservoir management."
-                        : "Optimize energy grids for potential peak load fluctuations due to thermal shifts."}
-                    </p>
+              ) : (
+                <>
+                  <p className="text-muted mb-4">
+                    Based on current AI diagnostics for <span className="text-dark fw-semibold">{locationName.split(',')[0]}</span>, 
+                    the following professional mitigation strategies are recommended to enhance regional climate resilience.
+                  </p>
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <div className="p-3 bg-light rounded-3 border-start border-4 border-primary">
+                        <h6 className="fw-bold mb-1 small">Infrastructure Prep</h6>
+                        <p className="small text-muted mb-0">
+                          {floodRisk.toLowerCase() === "high" 
+                            ? "Prioritize clearing of drainage channels and secondary waterway inspection." 
+                            : "Schedule maintenance for water storage and irrigation distribution systems."}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="p-3 bg-light rounded-3 border-start border-4 border-success">
+                        <h6 className="fw-bold mb-1 small">Resource Allocation</h6>
+                        <p className="small text-muted mb-0">
+                          {droughtRisk.toLowerCase() === "high"
+                            ? "Activate emergency water conservation protocols and reservoir management."
+                            : "Optimize energy grids for potential peak load fluctuations due to thermal shifts."}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
               <div className="mt-4 d-flex gap-2">
                 <span className="badge bg-soft-primary text-primary border border-primary-subtle px-3 py-2 rounded-pill">Adaptive Management</span>
                 <span className="badge bg-soft-success text-success border border-success-subtle px-3 py-2 rounded-pill">Risk Mitigation</span>
@@ -575,9 +587,9 @@ const Dashboard = () => {
                 </div>
                 <div className="position-relative z-1">
                   <h6 className="text-primary fw-bold text-uppercase small mb-3">Actionable Intelligence</h6>
-                  <div className="display-6 fw-bold mb-2">94%</div>
+                  <div className="display-6 fw-bold mb-2">{isWaterBody ? "0%" : "94%"}</div>
                   <p className="small mb-4 opacity-75">Model confidence in regional adaptation metrics based on multi-source sensor fusion.</p>
-                  <button className="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow" onClick={() => window.print()}>
+                  <button className="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow" onClick={() => window.print()} disabled={isWaterBody}>
                     Generate Resilience Report
                   </button>
                 </div>
@@ -629,11 +641,13 @@ const Dashboard = () => {
               <div className="bg-white bg-opacity-10 rounded-3 p-3 mb-4">
                 <h6 className="fw-bold mb-1"><FaLightbulb className="text-warning me-2"/> AI Climate Insight</h6>
                 <p className="mb-0 lead fs-6">
-                  {loading 
-                    ? "--" 
-                    : (floodRisk.toLowerCase() === "high" 
-                        ? `“Rising rainfall variability combined with high humidity suggests increased flood likelihood in ${locationName.split(',')[0]}.”`
-                        : `“This area shows high rainfall variability and ${droughtRisk.toLowerCase()} drought risk levels.”`)}
+                  {loading
+                    ? "--"
+                    : isWaterBody 
+                      ? "“Predictive models are optimized for terrestrial ecosystems. Analysis for maritime regions is currently constrained to atmospheric telemetry.”"
+                      : (floodRisk.toLowerCase() === "high" 
+                          ? `“Rising rainfall variability combined with high humidity suggests increased flood likelihood in ${locationName.split(',')[0]}.”`
+                          : `“This area shows high rainfall variability and ${droughtRisk.toLowerCase()} drought risk levels.”`)}
                 </p>
               </div>
               <div className="row g-3">
@@ -652,7 +666,7 @@ const Dashboard = () => {
                       <div className="progress-bar bg-warning" style={{width: `${(1-currentWeather.soilMoisture)*100}%`}}></div>
                    </div>
                    <div className="text-end small">
-                     {currentWeather.soilMoisture === null ? "--" : (100 - (currentWeather.soilMoisture*100)).toFixed(0) + "% Scarcity Index"}
+                     {currentWeather.soilMoisture === null ? "N/A" : (100 - (currentWeather.soilMoisture*100)).toFixed(0) + "% Scarcity Index"}
                    </div>
                 </div>
               </div>
@@ -667,7 +681,7 @@ const Dashboard = () => {
             <div className="card-body">
               <div className="text-center mb-4">
                 <div className="display-6 fw-bold text-primary">
-                  {recentSnapshot ? (recentSnapshot.precipitation_sum?.reduce((a, b) => a + (b || 0), 0) || 0).toFixed(1) : '--'}mm
+                  {recentSnapshot ? (recentSnapshot.precipitation_sum?.reduce((a, b) => a + (b || 0), 0) || 0).toFixed(1) : (loading ? '--' : 'N/A')}mm
                 </div>
                 <div className="text-muted small">Total Rainfall (Past 30 Days)</div>
               </div>
@@ -748,9 +762,11 @@ const Dashboard = () => {
           <RiskGauge
             title="Heatwave Potential"
             label={
-              currentWeather.maxTemp === null 
+              loading 
                 ? "--" 
-                : (currentWeather.maxTemp > 38 ? "High" : currentWeather.maxTemp > 32 ? "Medium" : "Low")
+                : (isWaterBody || currentWeather.maxTemp === null 
+                    ? "N/A" 
+                    : (currentWeather.maxTemp > 38 ? "High" : currentWeather.maxTemp > 32 ? "Medium" : "Low"))
             }
             icon={<FaTemperatureHigh size={22} className="text-danger" />}
           />
@@ -867,10 +883,10 @@ const Dashboard = () => {
               </div>
               <ul className="list-unstyled mb-0">
                 <li className="mb-2">
-                  <strong className="text-secondary">Flood potential:</strong> {floodRisk} risk based on soil moisture and precipitation.
+                  <strong className="text-secondary">Flood potential:</strong> {isWaterBody ? "--" : floodRisk} risk based on soil moisture and precipitation.
                 </li>
                 <li className="mb-2">
-                  <strong className="text-secondary">Drought outlook:</strong> {droughtRisk} risk with soil moisture at {formatPercent(currentWeather.soilMoisture)}.
+                  <strong className="text-secondary">Drought outlook:</strong> {isWaterBody ? "--" : droughtRisk} risk with soil moisture at {isWaterBody ? "--" : formatPercent(currentWeather.soilMoisture)}.
                 </li>
                 <li className="mb-2">
                   <strong className="text-secondary">Temperature anomaly:</strong> Peak 24h temperature of {formatDegrees(currentWeather.maxTemp)} suggests {

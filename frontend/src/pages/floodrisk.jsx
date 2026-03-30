@@ -95,7 +95,7 @@ const FloodRiskPage = () => {
   
   // If water, override prediction values
   const floodPrediction = isWater 
-    ? { label: '--', score: 0 } 
+    ? { label: 'N/A', score: 0 } 
     : rawPrediction;
 
   const weather = data?.weather;
@@ -140,7 +140,7 @@ const FloodRiskPage = () => {
   };
 
   const getInsight = (label) => {
-    if (label === '--') return "Analysis Unavailable: The selected location is identified as a water body or non-terrestrial surface. Flood risk assessment is not applicable.";
+    if (label === 'N/A' || label === '--') return "Analysis Unavailable: The selected location is identified as a water body. Flood risk models are calibrated for land-surface runoff.";
     if (label === 'High') return "Critical levels of soil moisture and precipitation detected. The AI model indicates a significant probability of runoff and flash flooding. Avoid low-lying areas.";
     if (label === 'Medium') return "Moderate risk conditions observed. Soil saturation is increasing; continued rainfall may lead to localized waterlogging.";
     return "Environmental conditions are stable. Current precipitation and soil saturation levels are within safe limits, posing no immediate flood threat.";
@@ -218,15 +218,15 @@ const FloodRiskPage = () => {
                 <div className="row mt-3">
                   <div className="col-4">
                     <strong>Precipitation</strong><br />
-                    {weather.precipitation} mm
+                    {isWater ? "--" : weather?.precipitation ?? "--"} mm
                   </div>
                   <div className="col-4">
                     <strong>Soil Moisture</strong><br />
-                    {weather.soilMoisture ?? '--'} m³/m³
+                    {isWater ? "--" : weather?.soilMoisture ?? '--'} m³/m³
                   </div>
                   <div className="col-4">
                     <strong>Wind Speed</strong><br />
-                    {weather.windSpeed} km/h
+                    {isWater ? "--" : weather?.windSpeed ?? "--"} km/h
                   </div>
                 </div>
               </ResultCard>
