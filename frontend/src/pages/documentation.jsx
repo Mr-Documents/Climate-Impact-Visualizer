@@ -42,7 +42,7 @@ const DocumentationPage = () => {
     {
       title: "Strategic Resilience Framework",
       icon: <FaShieldAlt className="text-info" />,
-      content: "Beyond data visualization, the platform provides actionable adaptation strategies. Based on AI-detected risk levels (High/Medium/Low), the system recommends specific mitigation steps—ranging from infrastructure preparation for drainage management to resource allocation protocols for emergency water conservation."
+      content: "Beyond data visualization, the platform provides actionable adaptation strategies. Based on AI-detected risk levels (High/Medium/Low), the system recommends specific mitigation steps, ranging from infrastructure preparation for drainage management to resource allocation protocols for emergency water conservation."
     },
     {
       title: "Historical Evolution Analysis",
