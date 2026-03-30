@@ -134,6 +134,17 @@ const Dashboard = () => {
   const [isWaterBody, setIsWaterBody] = useState(false);
   const [recentSnapshot, setRecentSnapshot] = useState(null);
 
+  const fetchLocationName = useCallback(async (lat, lon) => {
+    try {
+      const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`;
+      const res = await axios.get(geoUrl, { headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } });
+      const name = res.data.display_name?.split(',').slice(0, 3).join(',') || "Selected Location";
+      setLocationName(name);
+    } catch (err) {
+      console.error("Geocoding failed", err);
+    }
+  }, []);
+
   const [currentWeather, setCurrentWeather] = useState({
     temperature: null,
     humidity: null,
@@ -366,7 +377,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchAllData(coords.lat, coords.lon);
-  }, [coords.lat, coords.lon, fetchAllData]);
+    fetchLocationName(coords.lat, coords.lon);
+  }, [coords.lat, coords.lon, fetchAllData, fetchLocationName]);
 
   const kpiCards = [
     {

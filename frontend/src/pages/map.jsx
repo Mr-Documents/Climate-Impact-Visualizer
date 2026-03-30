@@ -129,7 +129,7 @@ const MapPage = () => {
 
   const fetchLocationName = useCallback(async (lat, lon) => {
     try {
-      const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+      const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`;
       const res = await axios.get(geoUrl, { headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } });
       const name = res.data.display_name?.split(',').slice(0, 3).join(',') || "Selected Location";
       setLocationName(name);
