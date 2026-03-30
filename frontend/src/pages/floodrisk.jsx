@@ -31,6 +31,7 @@ const FloodRiskPage = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [validationError, setValidationError] = useState(null);
   const [locationError, setLocationError] = useState(null);
 
@@ -63,6 +64,26 @@ const FloodRiskPage = () => {
     } catch (err) {
       console.error(err);
       alert("Failed to analyze flood risk");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLocationSearch = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
+      if (res.data && res.data.length > 0) {
+        const { lat, lon } = res.data[0];
+        handleAnalyze(parseFloat(lat), parseFloat(lon));
+        setSearchQuery("");
+      } else {
+        alert("Area not found.");
+      }
+    } catch (err) {
+      console.error("Search error", err);
     } finally {
       setLoading(false);
     }
@@ -134,6 +155,19 @@ const FloodRiskPage = () => {
 
       <div className="row">
         <div className="col-md-4">
+          <form onSubmit={handleLocationSearch} className="mb-3">
+            <div className="input-group">
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Enter city or area name..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <button className="btn btn-primary" type="submit" disabled={loading}>Search</button>
+            </div>
+          </form>
+          <div className="text-muted small mb-2">Or enter coordinates:</div>
           <CoordinateForm
             onSubmit={handleAnalyze}
             loading={loading}

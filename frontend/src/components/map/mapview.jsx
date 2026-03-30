@@ -1,6 +1,6 @@
 // src/components/map/mapview.jsx
-import React, { useState } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import React, { useState, useEffect } from "react";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -13,9 +13,23 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
 });
 
+// Helper component to update map center when lat/lon props change from external inputs
+function MapRecenter({ lat, lon }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([lat, lon], map.getZoom());
+  }, [lat, lon, map]);
+  return null;
+}
+
 // Child component to handle clicks
 function ClickableMarker({ onSelect, initialPosition }) {
   const [position, setPosition] = useState(initialPosition);
+
+  // Sync internal marker position when parent coordinates change (e.g., after search)
+  useEffect(() => {
+    setPosition(initialPosition);
+  }, [initialPosition]);
 
   useMapEvents({
     click(e) {
@@ -41,6 +55,7 @@ function UnifiedMap({ lat = 5.6037, lon = -0.1870, onSelect, children }) {
   return (
     <div style={{ height: "400px", width: "100%", marginTop: "20px" }}>
       <MapContainer center={[lat, lon]} zoom={7} style={{ height: "100%", width: "100%" }}>
+        <MapRecenter lat={lat} lon={lon} />
         <TileLayer
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
           attribution='Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'

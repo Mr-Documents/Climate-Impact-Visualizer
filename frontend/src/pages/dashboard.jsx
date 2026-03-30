@@ -131,6 +131,7 @@ const Dashboard = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
   const [locationName, setLocationName] = useState("Accra, Ghana");
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isWaterBody, setIsWaterBody] = useState(false);
   const [recentSnapshot, setRecentSnapshot] = useState(null);
 
@@ -215,6 +216,26 @@ const Dashboard = () => {
       predictions,
       sources: dataSources,
     };
+  };
+
+  const handleLocationSearch = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
+      if (res.data && res.data.length > 0) {
+        const { lat, lon } = res.data[0];
+        setCoords({ lat: parseFloat(lat), lon: parseFloat(lon) });
+        setSearchQuery("");
+      } else {
+        alert("Location name not found.");
+      }
+    } catch (err) {
+      console.error("Geocoding search failed", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const refreshAlerts = useCallback(
@@ -331,6 +352,11 @@ const Dashboard = () => {
         // --- AI predictions ---
         const isWater = predictionRes.data?.isWater || false;
         setIsWaterBody(isWater);
+        
+        // Capture 30-day snapshot and location name from the prediction response
+        if (predictionRes.data?.recentSnapshot) setRecentSnapshot(predictionRes.data.recentSnapshot);
+        if (predictionRes.data?.locationName) setLocationName(predictionRes.data.locationName);
+
         const predictionData = predictionRes.data?.prediction || {};
         
         let floodLabel = predictionData.flood?.label ?? "--";
@@ -445,9 +471,22 @@ const Dashboard = () => {
 
       {/* Input & Validation Alerts Section */}
       <div className="card shadow-sm border-0 mb-4 p-3">
-        <h5 className="mb-0 fw-bold d-flex align-items-center gap-2">
+        <h5 className="mb-3 fw-bold d-flex align-items-center gap-2">
            <FaMapMarkedAlt className="text-primary" /> Update Location
         </h5>
+        <form onSubmit={handleLocationSearch} className="mb-3">
+          <div className="input-group">
+            <input 
+              type="text" 
+              className="form-control" 
+              placeholder="Enter area name (e.g. Lagos, Nigeria)" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button className="btn btn-primary" type="submit" disabled={loading}>Search by Name</button>
+          </div>
+        </form>
+        <div className="text-muted small mb-2">Or enter coordinates manually:</div>
         <CoordinateForm 
           onSubmit={handleManualCoordinates} 
           loading={loading} 
@@ -648,12 +687,6 @@ const Dashboard = () => {
                 onSelect={(lat, lon) => setCoords({ lat, lon })}
               >
                 <MapOverlays center={[coords.lat, coords.lon]} layers={mapLayers} />
-                {/* AI Predicted Risk Circle */}
-                <Circle 
-                  center={[coords.lat, coords.lon]} 
-                  radius={30000} 
-                  pathOptions={{ color: getRiskColor(floodRisk), fillColor: getRiskColor(floodRisk), fillOpacity: 0.3 }} 
-                />
               </UnifiedMap>
 
               <div className="mt-3 d-flex gap-2 flex-wrap">

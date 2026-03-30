@@ -92,6 +92,7 @@ const weatherLayers = {
 const MapPage = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [data, setData] = useState({
     weather: null,
     airQuality: null,
@@ -126,6 +127,26 @@ const MapPage = () => {
       setLoading(false);
     }
   }, []);
+
+  const handleLocationSearch = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
+      if (res.data && res.data.length > 0) {
+        const { lat, lon } = res.data[0];
+        setCoords({ lat: parseFloat(lat), lon: parseFloat(lon) });
+        setSearchQuery("");
+      } else {
+        alert("Location not found. Please try a different name.");
+      }
+    } catch (err) {
+      console.error("Search failed", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchLocationName = useCallback(async (lat, lon) => {
     try {
@@ -231,14 +252,23 @@ const MapPage = () => {
 
   const extremeEvents = React.useMemo(() => {
     if (!historicalAnalysis?.raw?.time) return [];
-    // Detect precipitation > 95th percentile or Temp > 35
+    
+    // Dynamically calculate the 95th percentile for local rainfall accuracy
+    const rainValues = historicalAnalysis.raw.precipitation_sum
+      ?.filter(r => r > 0.1) // Only consider actual wet days
+      .sort((a, b) => a - b) || [];
+    
+    const p95Rain = rainValues.length > 0 
+      ? rainValues[Math.floor(rainValues.length * 0.95)] 
+      : 50; // Fallback to 50mm if no data
+
     return historicalAnalysis.raw.time
       .map((t, i) => ({ 
         time: t, 
         rain: historicalAnalysis.raw.precipitation_sum?.[i] || 0, 
         temp: historicalAnalysis.raw.temperature_2m_mean?.[i] || 0 
       }))
-      .filter(d => d.rain > 50 || d.temp > 38)
+      .filter(d => d.rain > p95Rain || d.temp > 38)
       .slice(-5); // Show last 5 extreme events
   }, [historicalAnalysis]);
 
@@ -287,6 +317,19 @@ const MapPage = () => {
           <div className="d-flex align-items-center gap-2 mb-3 fw-bold text-primary">
             <FaMapMarkedAlt /> <span>Coordinate Analysis Engine</span>
           </div>
+          <form onSubmit={handleLocationSearch} className="mb-3">
+            <div className="input-group">
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Search by city or area name..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <button className="btn btn-primary" type="submit" disabled={loading}>Search Location</button>
+            </div>
+          </form>
+          <div className="text-muted small mb-2">Or enter coordinates manually:</div>
           <CoordinateForm
             onSubmit={(lat, lon) => setCoords({ lat: Number(lat), lon: Number(lon) })}
             loading={loading}
