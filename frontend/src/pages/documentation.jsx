@@ -7,7 +7,9 @@ import {
   FaShieldAlt, 
   FaChartBar, 
   FaMapMarkedAlt,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaHistory,
+  FaBell
 } from "react-icons/fa";
 
 const DocumentationPage = () => {
@@ -15,7 +17,7 @@ const DocumentationPage = () => {
     {
       title: "System Overview",
       icon: <FaInfoCircle className="text-primary" />,
-      content: "The Climate Impact Visualizer is a high-performance analytical platform designed to provide real-time environmental monitoring and predictive risk assessment. By integrating satellite telemetry with local meteorological data, the system empowers decision-makers with actionable insights into flood and drought vulnerabilities."
+      content: "The Climate Impact Visualizer is a high-performance analytical platform designed for real-time environmental monitoring and strategic risk assessment. By synthesizing multi-source meteorological telemetry with custom-trained AI, the system provides a comprehensive resilience framework for identifying and mitigating climate-driven vulnerabilities."
     },
     {
       title: "Core Analytical Modules",
@@ -38,15 +40,31 @@ const DocumentationPage = () => {
       )
     },
     {
+      title: "Strategic Resilience Framework",
+      icon: <FaShieldAlt className="text-info" />,
+      content: "Beyond data visualization, the platform provides actionable adaptation strategies. Based on AI-detected risk levels (High/Medium/Low), the system recommends specific mitigation steps—ranging from infrastructure preparation for drainage management to resource allocation protocols for emergency water conservation."
+    },
+    {
+      title: "Historical Evolution Analysis",
+      icon: <FaHistory className="text-danger" />,
+      content: "Our Deep Dive engine reconstructs 30+ years of climate history for any coordinate. It utilizes linear regression to identify warming trends and calculates the Standardized Precipitation Index (SPI) to detect multi-year drought cycles, providing crucial context for long-term urban and agricultural planning."
+    },
+    {
       title: "Interpreting Climate Metrics",
       icon: <FaDatabase className="text-warning" />,
       content: (
         <ul className="list-group list-group-flush small">
           <li className="list-group-item"><strong>Soil Moisture (m³/m³):</strong> Represents the volumetric water content in the topsoil. Values below 0.1 typically indicate drought stress.</li>
+          <li className="list-group-item"><strong>Standardized Precipitation Index (SPI):</strong> A probability index that quantifies moisture deficits or surpluses relative to a 30-year baseline.</li>
           <li className="list-group-item"><strong>VPD (Vapour Pressure Deficit):</strong> Measures the atmospheric "thirst." High VPD leads to rapid plant transpiration and increased fire risk.</li>
           <li className="list-group-item"><strong>AQI Components:</strong> Monitoring PM2.5 and NO₂ concentrations according to global WHO safety standards.</li>
         </ul>
       )
+    },
+    {
+      title: "Early Warning System (EWS)",
+      icon: <FaBell className="text-primary" />,
+      content: "The platform features a real-time alerting engine. When the AI model detects a 'High' risk score for flood or drought, or when meteorological sensors record extreme spikes (e.g., rainfall > 15mm/hr), an automated advisory is generated within the Alerts center."
     },
     {
       title: "Data Integrity & Sources",
@@ -75,7 +93,7 @@ const DocumentationPage = () => {
           <div className="d-flex align-items-center gap-3 mb-5">
             <FaBook size={40} className="text-primary" />
             <div>
-              <h1 className="fw-bold mb-0">Technical Documentation</h1>
+              <h1 className="fw-bold mb-0">System Guide & Documentation</h1>
               <p className="text-muted mb-0">System Architecture, API Specifications, and User Guides</p>
             </div>
           </div>

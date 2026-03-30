@@ -54,11 +54,11 @@ function ClickableMarker({ onSelect, initialPosition }) {
 function UnifiedMap({ lat = 5.6037, lon = -0.1870, onSelect, children }) {
   return (
     <div style={{ height: "400px", width: "100%", marginTop: "20px" }}>
-      <MapContainer center={[lat, lon]} zoom={7} style={{ height: "100%", width: "100%" }}>
+      <MapContainer center={[lat, lon]} zoom={7} style={{ height: "100%", width: "100%" }} attributionControl={false}>
         <MapRecenter lat={lat} lon={lon} />
         <TileLayer
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
-          attribution='Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+          attribution=''
         />
         <ClickableMarker onSelect={onSelect} initialPosition={[lat, lon]} />
         {children /* Render FireSimulation, DrynessHeatmap, etc. */}

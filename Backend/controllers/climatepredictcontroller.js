@@ -164,9 +164,12 @@ export async function getHistoricalAnalysis(req, res) {
 
     // 1. Define the cache key and check for existing data
     const cacheKey = `${Number(lat).toFixed(2)}_${Number(lon).toFixed(2)}_${start_year}`;
-    if (historicalCache.has(cacheKey)) {
-      console.log(`[Cache Hit] Serving historical data for ${cacheKey}`);
-      return res.json(historicalCache.get(cacheKey));
+    const cachedEntry = historicalCache.get(cacheKey);
+
+    // Check if cache exists and is less than 24 hours old
+    if (cachedEntry && (Date.now() - cachedEntry.timestamp < 24 * 60 * 60 * 1000)) {
+      console.log(`[Cache Hit] Serving fresh historical data for ${cacheKey}`);
+      return res.json(cachedEntry.data);
     }
 
     // Open-Meteo Archive lag: Set end_date to 5 days ago to ensure data availability
@@ -270,7 +273,7 @@ export async function getHistoricalAnalysis(req, res) {
       const firstKey = historicalCache.keys().next().value;
       historicalCache.delete(firstKey);
     }
-    historicalCache.set(cacheKey, result);
+    historicalCache.set(cacheKey, { data: result, timestamp: Date.now() });
 
     res.json(result);
   } catch (err) {

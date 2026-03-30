@@ -65,25 +65,25 @@ const OWM_API_KEY = process.env.REACT_APP_OWM_API_KEY || process.env.VITE_OWM_AP
 const weatherLayers = {
   precipitation: {
     url: `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`,
-    attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+    attribution: '',
     name: 'Precipitation',
     icon: <FaTint />
   },
   temperature: {
     url: `https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`,
-    attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+    attribution: '',
     name: 'Temperature',
     icon: <FaTemperatureHigh />
   },
   wind: {
     url: `https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`,
-    attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+    attribution: '',
     name: 'Wind Speed',
     icon: <FaWind />
   },
   clouds: {
     url: `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`,
-    attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+    attribution: '',
     name: 'Cloud Cover',
     icon: <FaCloud />
   },
@@ -296,13 +296,6 @@ const MapPage = () => {
 
       {/* Hero Section */}
       <header className="dashboard-hero mb-4 rounded-4 overflow-hidden bg-dark text-white p-4 p-md-5 position-relative shadow">
-        <div className="position-absolute top-0 end-0 p-4 opacity-10">
-          <img 
-            src="/climate_visualizer_transparent.png" 
-            alt="Background Logo" 
-            style={{ width: '200px', filter: 'brightness(0) invert(1)' }} 
-          />
-        </div>
         <div className="position-relative z-1">
           <h1 className="h2 fw-bold mb-2">Climate Overview</h1>
           <p className="lead mb-0 opacity-75">
