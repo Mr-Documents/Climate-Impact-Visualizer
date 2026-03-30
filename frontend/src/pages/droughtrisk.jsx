@@ -5,7 +5,8 @@ import WeatherIcon from "../components/ui/weathericon";
 import axios from "axios";
 import ResultCard from "../components/reusable/resultcard";
 import { Line } from 'react-chartjs-2';
-import { FaInfoCircle, FaExclamationTriangle, FaWater } from "react-icons/fa";
+import { FaInfoCircle, FaExclamationTriangle, FaWater, FaMapMarkerAlt, FaRobot, FaShieldAlt, FaListUl, FaSun } from "react-icons/fa";
+import { Circle } from "react-leaflet";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -95,6 +96,47 @@ const DroughtRiskPage = () => {
     
   const weather = data?.weather;
   const history = data?.history;
+  const locationName = data?.locationName || "Selected Coordinate";
+
+  const getAIReasoning = (label) => {
+    if (isWater) return "Analysis bypassed: Maritime regions do not support terrestrial soil-moisture analysis.";
+    const temp = weather?.temperature || 0;
+    const soil = weather?.soilMoisture || 0;
+    const hum = weather?.humidity || 0;
+
+    let reasons = [];
+    if (temp > 35) reasons.push(`Thermal Stress (${temp.toFixed(1)}°C)`);
+    if (soil < 0.15) reasons.push(`Critical Moisture Deficit (${(soil * 100).toFixed(0)}%)`);
+    if (hum < 30) reasons.push(`Atmospheric Aridity (${hum.toFixed(0)}% RH)`);
+
+    if (label === 'Low' || reasons.length === 0) {
+      return reasons.length > 0 ? `Stability maintained despite ${reasons.join(", ")}. Current trends suggest these factors do not currently pose a significant drought threat.` : "Environmental moisture levels are currently within optimal parameters for regional vegetation.";
+    }
+    return `Vulnerability detected due to: ${reasons.join(" + ")}. Convergence of these factors is accelerating soil evapotranspiration and regional moisture loss.`;
+  };
+
+  const getSafetyProtocols = (label) => {
+    const protocols = {
+      High: [
+        "Implement mandatory water rationing and conservation protocols.",
+        "Activate emergency agricultural irrigation support.",
+        "Monitor for regional wildfire markers due to extreme aridity.",
+        "Minimize outdoor thermal exposure during peak solar hours."
+      ],
+      Medium: [
+        "Optimize reservoir management and irrigation scheduling.",
+        "Mulch terrestrial areas to minimize moisture loss.",
+        "Monitor livestock for heat stress indicators.",
+        "Audit water distribution infrastructure for leakages."
+      ],
+      Low: [
+        "Maintain standard water conservation practices.",
+        "Monitor long-term rainfall anomaly trends.",
+        "Evaluate seasonal soil moisture baseline deviations."
+      ]
+    };
+    return protocols[label] || protocols.Low;
+  };
 
   const chartData = history ? {
     labels: history.time,
@@ -113,6 +155,13 @@ const DroughtRiskPage = () => {
         backgroundColor: 'rgba(75, 192, 192, 0.5)',
         yAxisID: 'y1',
       },
+      {
+        label: 'Humidity (%)',
+        data: history.humidity,
+        borderColor: 'rgb(54, 162, 235)',
+        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+        yAxisID: 'y',
+      },
     ],
   } : null;
 
@@ -120,7 +169,7 @@ const DroughtRiskPage = () => {
     responsive: true,
     interaction: { mode: 'index', intersect: false },
     scales: {
-      y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Temperature (°C)' } },
+      y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Environment Metrics (°C | %)' } },
       y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Soil Moisture' } },
     },
   };
@@ -150,8 +199,18 @@ const DroughtRiskPage = () => {
 
       <div className="row">
         <div className="col-md-4">
+          <div className="card shadow-sm border-0 mb-3 bg-light">
+            <div className="card-body p-3">
+              <div className="small text-uppercase fw-bold text-secondary mb-1">Target Location</div>
+              <div className="d-flex align-items-center gap-2 text-dark fw-bold">
+                <FaMapMarkerAlt className="text-warning" />
+                <span>{loading ? "Locating..." : locationName}</span>
+              </div>
+            </div>
+          </div>
+
           <form onSubmit={handleLocationSearch} className="mb-3">
-            <div className="input-group">
+            <div className="input-group shadow-sm">
               <input 
                 type="text" 
                 className="form-control" 
@@ -183,8 +242,16 @@ const DroughtRiskPage = () => {
             <UnifiedMap
               lat={coords.lat}
               lon={coords.lon}
-              onSelect={(lat, lon) => setCoords({ lat, lon })}
-            />
+              onSelect={(lat, lon) => handleAnalyze(lat, lon)}
+            >
+              {!loading && !isWater && droughtPrediction?.label === 'High' && (
+                <Circle 
+                  center={[coords.lat, coords.lon]} 
+                  radius={8000} 
+                  pathOptions={{ color: '#ffc107', fillColor: '#ffc107', fillOpacity: 0.15, weight: 2, dashArray: '10, 10' }} 
+                />
+              )}
+            </UnifiedMap>
           </div>
         </div>
 
@@ -198,6 +265,21 @@ const DroughtRiskPage = () => {
 
           {!loading && data && (droughtPrediction || isWater) && (
             <div className="d-flex flex-column gap-3">
+              {/* AI Explanation Box */}
+              <div className="card border-0 shadow-sm overflow-hidden">
+                <div className="card-header bg-dark text-white py-3">
+                  <div className="d-flex align-items-center gap-2">
+                    <FaRobot className="text-warning" />
+                    <h6 className="mb-0 fw-bold">Diagnostic Reasoning Engine</h6>
+                  </div>
+                </div>
+                <div className="card-body bg-white">
+                  <p className="lead fs-6 mb-0 text-dark">
+                    {getAIReasoning(droughtPrediction?.label)}
+                  </p>
+                </div>
+              </div>
+
               <ResultCard
                 title="Prediction Result"
                 icon={<WeatherIcon type="drought" size={28} />}
@@ -227,13 +309,35 @@ const DroughtRiskPage = () => {
               </ResultCard>
 
               {chartData && !isWater && (
-                <div className="card shadow-sm p-3">
-                  <h5>24-Hour Environmental Trend</h5>
+                <div className="card shadow-sm border-0 p-3">
+                  <h5 className="fw-bold h6 mb-3">24-Hour Regional Stress Trends</h5>
                   <Line options={chartOptions} data={chartData} />
                 </div>
               )}
 
-              <div className={`alert ${droughtPrediction?.label === 'High' ? 'alert-danger' : droughtPrediction?.label === 'Medium' ? 'alert-warning' : droughtPrediction?.label === '--' ? 'alert-secondary' : 'alert-success'} shadow-sm border-0 d-flex gap-3 align-items-start`}>
+              {/* Safety Recommendations */}
+              {!isWater && (
+                <div className="card border-0 shadow-sm">
+                  <div className="card-header bg-white py-3 border-bottom">
+                    <div className="d-flex align-items-center gap-2">
+                      <FaShieldAlt className="text-primary" />
+                      <h6 className="mb-0 fw-bold">Resilience Protocols</h6>
+                    </div>
+                  </div>
+                  <div className="card-body">
+                    <ul className="list-group list-group-flush">
+                      {getSafetyProtocols(droughtPrediction?.label).map((step, i) => (
+                        <li key={i} className="list-group-item border-0 px-0 d-flex gap-3 small">
+                          <FaListUl className="mt-1 text-muted flex-shrink-0" />
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              <div className={`alert ${droughtPrediction?.label === 'High' ? 'alert-danger' : droughtPrediction?.label === 'Medium' ? 'alert-warning' : (droughtPrediction?.label === '--' || isWater) ? 'alert-secondary' : 'alert-success'} shadow-sm border-0 d-flex gap-3 align-items-start`}>
                 <FaInfoCircle className="mt-1 flex-shrink-0" size={20} />
                 <div>
                   <h5 className="alert-heading fw-bold h6">AI Prediction Insight</h5>

@@ -71,7 +71,8 @@ export async function predictClimate(req, res) {
       temperature: [],
       humidity: [],
       soilMoisture: [],
-      precipitation: []
+      precipitation: [],
+      windSpeed: []
     };
     const featuresSequence = [];
 
@@ -92,6 +93,7 @@ export async function predictClimate(req, res) {
         historyData.humidity.push(hHum);
         historyData.soilMoisture.push(hSoil);
         historyData.precipitation.push(hourly.precipitation ? hourly.precipitation[idx] : 0);
+        historyData.windSpeed.push(hWind);
       }
 
       // Calculate derived features matching training script

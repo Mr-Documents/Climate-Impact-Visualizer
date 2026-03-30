@@ -5,7 +5,8 @@ import WeatherIcon from "../components/ui/weathericon";
 import axios from "axios";
 import ResultCard from "../components/reusable/resultcard";
 import { Line } from 'react-chartjs-2';
-import { FaInfoCircle, FaExclamationTriangle, FaWater } from "react-icons/fa";
+import { FaInfoCircle, FaExclamationTriangle, FaWater, FaMapMarkerAlt, FaRobot, FaShieldAlt, FaListUl } from "react-icons/fa";
+import { Circle } from "react-leaflet";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -100,6 +101,48 @@ const FloodRiskPage = () => {
 
   const weather = data?.weather;
   const history = data?.history;
+  const locationName = data?.locationName || "Selected Coordinate";
+
+  const getAIReasoning = (label) => {
+    if (isWater) return "Analysis bypassed: Maritime coordinates do not support terrestrial runoff modeling.";
+    const precip = weather?.precipitation || 0;
+    const soil = weather?.soilMoisture || 0;
+    
+    let reasons = [];
+    if (precip > 15) reasons.push(`Extreme Rainfall (${precip.toFixed(1)}mm/hr)`);
+    else if (precip > 5) reasons.push(`Moderate Precipitation (${precip.toFixed(1)}mm/hr)`);
+    
+    if (soil > 0.7) reasons.push(`Critical Soil Saturation (${(soil * 100).toFixed(0)}%)`);
+    else if (soil > 0.4) reasons.push(`Elevated Surface Moisture (${(soil * 100).toFixed(0)}%)`);
+
+    if (label === 'Low' || reasons.length === 0) {
+      return reasons.length > 0 ? `Nominal risk levels maintained despite ${reasons.join(", ")}. Model sequences indicate insufficient volume to trigger a flood event.` : "Environmental parameters are currently within nominal safety thresholds.";
+    }
+    return `Risk is driven by: ${reasons.join(" + ")}. Convergence of these factors increases regional runoff probability and land-surface vulnerability.`;
+  };
+
+  const getSafetyProtocols = (label) => {
+    const protocols = {
+      High: [
+        "Immediate evacuation of low-lying areas and floodplains.",
+        "Avoid all travel through standing water or submerged roads.",
+        "Disconnect utilities and move critical equipment to higher elevations.",
+        "Monitor emergency broadcast channels for flash flood updates."
+      ],
+      Medium: [
+        "Clear drainage channels and gutters of debris.",
+        "Secure outdoor items and move valuable assets from basements.",
+        "Plan alternative travel routes avoiding identified flood zones.",
+        "Prepare an emergency kit with 72-hour supplies."
+      ],
+      Low: [
+        "Monitor local weather forecasts for sudden intensity shifts.",
+        "Ensure secondary drainage systems are functional.",
+        "Standard awareness of local topography and water collection points."
+      ]
+    };
+    return protocols[label] || protocols.Low;
+  };
 
   const chartData = history ? {
     labels: history.time,
@@ -118,6 +161,13 @@ const FloodRiskPage = () => {
         backgroundColor: 'rgba(75, 192, 192, 0.5)',
         yAxisID: 'y1',
       },
+      {
+        label: 'Wind Speed (km/h)',
+        data: history.windSpeed,
+        borderColor: 'rgb(153, 102, 255)',
+        backgroundColor: 'rgba(153, 102, 255, 0.5)',
+        yAxisID: 'y',
+      },
     ],
   } : null;
 
@@ -125,7 +175,7 @@ const FloodRiskPage = () => {
     responsive: true,
     interaction: { mode: 'index', intersect: false },
     scales: {
-      y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Precipitation (mm)' } },
+      y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Atmospheric Metrics (mm | km/h)' } },
       y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Soil Moisture' } },
     },
   };
@@ -155,8 +205,18 @@ const FloodRiskPage = () => {
 
       <div className="row">
         <div className="col-md-4">
+          <div className="card shadow-sm border-0 mb-3 bg-light">
+            <div className="card-body p-3">
+              <div className="small text-uppercase fw-bold text-secondary mb-1">Target Location</div>
+              <div className="d-flex align-items-center gap-2 text-dark fw-bold">
+                <FaMapMarkerAlt className="text-primary" />
+                <span>{loading ? "Locating..." : locationName}</span>
+              </div>
+            </div>
+          </div>
+
           <form onSubmit={handleLocationSearch} className="mb-3">
-            <div className="input-group">
+            <div className="input-group shadow-sm">
               <input 
                 type="text" 
                 className="form-control" 
@@ -188,8 +248,16 @@ const FloodRiskPage = () => {
             <UnifiedMap
               lat={coords.lat}
               lon={coords.lon}
-              onSelect={(lat, lon) => setCoords({ lat, lon })}
-            />
+              onSelect={(lat, lon) => handleAnalyze(lat, lon)}
+            >
+              {!loading && !isWater && floodPrediction?.label === 'High' && (
+                <Circle 
+                  center={[coords.lat, coords.lon]} 
+                  radius={5000} 
+                  pathOptions={{ color: '#dc3545', fillColor: '#dc3545', fillOpacity: 0.2, weight: 2, dashArray: '5, 10' }} 
+                />
+              )}
+            </UnifiedMap>
           </div>
         </div>
 
@@ -203,6 +271,21 @@ const FloodRiskPage = () => {
 
           {!loading && data && (floodPrediction || isWater) && (
             <div className="d-flex flex-column gap-3">
+              {/* AI Explanation Box */}
+              <div className="card border-0 shadow-sm overflow-hidden">
+                <div className="card-header bg-dark text-white py-3">
+                  <div className="d-flex align-items-center gap-2">
+                    <FaRobot className="text-primary" />
+                    <h6 className="mb-0 fw-bold">Diagnostic Reasoning Engine</h6>
+                  </div>
+                </div>
+                <div className="card-body bg-white">
+                  <p className="lead fs-6 mb-0 text-dark">
+                    {getAIReasoning(floodPrediction?.label)}
+                  </p>
+                </div>
+              </div>
+
               <ResultCard
                 title="Prediction Result"
                 icon={<WeatherIcon type="flood" size={28} />}
@@ -232,13 +315,35 @@ const FloodRiskPage = () => {
               </ResultCard>
 
               {chartData && !isWater && (
-                <div className="card shadow-sm p-3">
-                  <h5>24-Hour Environmental Trend</h5>
+                <div className="card shadow-sm border-0 p-3">
+                  <h5 className="fw-bold h6 mb-3">24-Hour Environmental Trend Analysis</h5>
                   <Line options={chartOptions} data={chartData} />
                 </div>
               )}
 
-              <div className={`alert ${floodPrediction?.label === 'High' ? 'alert-danger' : floodPrediction?.label === 'Medium' ? 'alert-warning' : floodPrediction?.label === '--' ? 'alert-secondary' : 'alert-success'} shadow-sm border-0 d-flex gap-3 align-items-start`}>
+              {/* Safety Recommendations */}
+              {!isWater && (
+                <div className="card border-0 shadow-sm">
+                  <div className="card-header bg-white py-3 border-bottom">
+                    <div className="d-flex align-items-center gap-2">
+                      <FaShieldAlt className="text-success" />
+                      <h6 className="mb-0 fw-bold">Professional Safety Protocols</h6>
+                    </div>
+                  </div>
+                  <div className="card-body">
+                    <ul className="list-group list-group-flush">
+                      {getSafetyProtocols(floodPrediction?.label).map((step, i) => (
+                        <li key={i} className="list-group-item border-0 px-0 d-flex gap-3 small">
+                          <FaListUl className="mt-1 text-muted flex-shrink-0" />
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              <div className={`alert ${floodPrediction?.label === 'High' ? 'alert-danger' : floodPrediction?.label === 'Medium' ? 'alert-warning' : (floodPrediction?.label === '--' || isWater) ? 'alert-secondary' : 'alert-success'} shadow-sm border-0 d-flex gap-3 align-items-start`}>
                 <FaInfoCircle className="mt-1 flex-shrink-0" size={20} />
                 <div>
                   <h5 className="alert-heading fw-bold h6">AI Prediction Insight</h5>
