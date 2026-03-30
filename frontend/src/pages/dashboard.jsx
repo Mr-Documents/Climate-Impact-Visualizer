@@ -342,9 +342,9 @@ const Dashboard = () => {
         const futureSlice = weatherSeries.slice(safeNowIndex + 1, safeNowIndex + 25);
 
         // Data for Historical Trends Chart
-        const rainHist = historySlice.map((s) => Number(s.precipitation ?? 0));
-        const tempHist = historySlice.map((s) => Number(s.temperature ?? 0));
-        const windHist = historySlice.map((s) => Number(s.windSpeed ?? 0));
+        const rainHist = historySlice.map((s) => s.precipitation).filter(v => v !== null);
+        const tempHist = historySlice.map((s) => s.temperature).filter(v => v !== null);
+        const windHist = historySlice.map((s) => s.windSpeed).filter(v => v !== null);
         const labelsHist = historySlice.map((s) => {
             const d = new Date(s.time);
             return `${d.getHours()}:00`;
@@ -352,11 +352,11 @@ const Dashboard = () => {
 
         // Summary Values (Current)
         const currentItem = weatherSeries[safeNowIndex] || {};
-        const lastHourRain = currentItem.precipitation ?? 0;
-        const totalRain24 = rainHist.reduce((a, b) => a + b, 0); // Accumulate past 24h rain
+        const lastHourRain = currentItem.precipitation ?? null;
+        const totalRain24 = rainHist.length > 0 ? rainHist.reduce((a, b) => a + b, 0) : null;
         const avgTemp = computeAverage(tempHist);
         // Calculate the maximum temperature reached in the last 24 hours for accurate heatwave monitoring
-        const maxTemp24h = tempHist.length > 0 ? Math.max(...tempHist) : (currentItem.temperature ?? 0);
+        const maxTemp24h = tempHist.length > 0 ? Math.max(...tempHist) : (currentItem.temperature ?? null);
 
         const nextWeatherSummary = {
           temperature: avgTemp,
@@ -822,7 +822,11 @@ const Dashboard = () => {
                       <h6 className="fw-bold">Temperature Projection</h6>
                       <Line
                         data={{
-                          labels: predictions.temperature.map((_, idx) => `+${idx + 1}h`),
+                          labels: Array.from({ length: 24 }, (_, i) => {
+                            const d = new Date();
+                            d.setHours(d.getHours() + i + 1);
+                            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                          }),
                           datasets: [
                             {
                               label: "Temperature (°C)",
