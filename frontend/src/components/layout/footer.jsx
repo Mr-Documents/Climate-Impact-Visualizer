@@ -25,7 +25,7 @@ function Footer() {
               </li>
               <li className="mb-2">
                 <Link className="text-primary text-decoration-none" to="/map">
-                  Map Overview
+                  Climate Overview
                 </Link>
               </li>
             </ul>

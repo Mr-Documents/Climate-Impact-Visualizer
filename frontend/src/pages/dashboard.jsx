@@ -634,12 +634,12 @@ const Dashboard = () => {
               <div className="d-flex align-items-center gap-3 mb-4">
                 <div className="rounded-circle bg-white bg-opacity-25 p-3"><FaRobot size={24} /></div>
                 <div>
-                  <h5 className="mb-0 fw-bold">AI Location Intelligence</h5>
+                  <h5 className="mb-0 fw-bold"> Location Intelligence</h5>
                   <div className="small opacity-75"><FaMapMarkerAlt size={12}/> {locationName}</div>
                 </div>
               </div>
               <div className="bg-white bg-opacity-10 rounded-3 p-3 mb-4">
-                <h6 className="fw-bold mb-1"><FaLightbulb className="text-warning me-2"/> AI Climate Insight</h6>
+                <h6 className="fw-bold mb-1"><FaLightbulb className="text-warning me-2"/> Climate Insight</h6>
                 <p className="mb-0 lead fs-6">
                   {loading
                     ? "--"
