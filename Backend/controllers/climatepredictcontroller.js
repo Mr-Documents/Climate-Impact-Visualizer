@@ -162,7 +162,7 @@ export async function predictClimate(req, res) {
  */
 export async function getHistoricalAnalysis(req, res) {
   try {
-    const { lat, lon, start_year = 1990 } = req.query;
+    const { lat, lon, start_year = new Date().getFullYear() - 30 } = req.query;
     
     if (!lat || !lon) {
       return res.status(400).json({ error: "Latitude and Longitude are required." });
@@ -184,8 +184,8 @@ export async function getHistoricalAnalysis(req, res) {
     const end_date = date.toISOString().split('T')[0];
     const start_date = `${start_year}-01-01`;
 
-    // Corrected parameter: relative_humidity_2m_mean
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start_date}&end_date=${end_date}&daily=temperature_2m_mean,precipitation_sum,relative_humidity_2m_mean&timezone=auto`;
+    // Fixed: Removed relative_humidity_2m_mean as it is not supported by the Archive API daily endpoint
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start_date}&end_date=${end_date}&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
     
     const response = await fetch(url);
     const data = await response.json();
@@ -232,6 +232,14 @@ export async function getHistoricalAnalysis(req, res) {
     const yearsCount = Math.max(1, n / 365);
     const avgAnnualRain = (totalRain / yearsCount);
     const lastYearRain = rainData.slice(-365).reduce((a, b) => a + (b || 0), 0);
+
+    // --- Extreme Rainfall Calculations ---
+    const wetDays = rainData.filter(r => r > 0.1).sort((a, b) => a - b);
+    const p95Threshold = wetDays.length > 0 ? wetDays[Math.floor(wetDays.length * 0.95)] : 50;
+    const extremeRainDays = rainData.filter(r => r > p95Threshold).length;
+    const maxDailyRain = Math.max(...rainData, 0);
+    const extremeRainFrequency = ((extremeRainDays / n) * 100).toFixed(2);
+
     
     // Prevent division by zero if avgAnnualRain is 0
     const rainAnomaly = avgAnnualRain > 0 ? (((lastYearRain - avgAnnualRain) / avgAnnualRain) * 100).toFixed(1) : "0.0";
@@ -263,14 +271,17 @@ export async function getHistoricalAnalysis(req, res) {
     const result = {
       raw: {
         ...data.daily,
-        humidity_2m_mean: data.daily.relative_humidity_2m_mean || Array(n).fill(null)
+        humidity_2m_mean: Array(n).fill(null) // Archive API doesn't provide daily mean humidity
       },
       insights: {
         tempTrend: (slope * n).toFixed(2),
         isWarming: (slope * n) > 0,
         avgPrecip: avgAnnualRain.toFixed(2),
         rainAnomaly: rainAnomaly,
-        droughtSeries: droughtIndexSeries
+        droughtSeries: droughtIndexSeries,
+        maxDailyRain: maxDailyRain.toFixed(1),
+        extremeRainCount: extremeRainDays,
+        extremeRainFrequency: extremeRainFrequency
       }
     };
 
@@ -296,9 +307,8 @@ export async function getUVDryness(req, res) {
     const { lat, lon } = req.query;
     if (!lat || !lon) return res.status(400).json({ error: 'Coordinates required' });
 
-    // Open-Meteo API for UV (hourly/current) and VPD (hourly)
-    // Removed &timezone=auto to ensure response uses UTC, matching frontend's ISO date comparison
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=uv_index,vapour_pressure_deficit&current=uv_index,is_day&forecast_days=1`;
+    // Using GMT to match frontend ISO time comparison and 2 days to handle date-line transitions
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=uv_index,vapour_pressure_deficit&current=uv_index,is_day&forecast_days=2&timezone=GMT`;
     
     const response = await fetch(url);
     const data = await response.json();

@@ -103,7 +103,7 @@ const MapPage = () => {
   const [histError, setHistError] = useState(null);
   const [histLoading, setHistLoading] = useState(false);
   const [locationName, setLocationName] = useState("");
-  const [startYear, setStartYear] = useState(1994); // 30 years ago approx
+  const [startYear, setStartYear] = useState(new Date().getFullYear() - 30);
   const [chartType, setChartType] = useState('line'); // 'line' or 'bar'
 
   const fetchAllClimateData = useCallback(async (lat, lon) => {
@@ -206,7 +206,7 @@ const MapPage = () => {
   // Helper: Find value corresponding to current hour in hourly arrays
   const getHourlyValue = (source, key) => {
     if (!source?.hourly?.[key] || !source?.hourly?.time) return null;
-    const nowISO = new Date().toISOString().slice(0, 13);
+    const nowISO = new Date().toISOString().split(':')[0]; // Gets YYYY-MM-DDTHH
     const idx = source.hourly.time.findIndex(t => t.startsWith(nowISO));
     // Return current hour value, or null if not found (don't default to 0 index as it might be night/0)
     return idx !== -1 ? source.hourly[key][idx] : null;
@@ -527,7 +527,7 @@ const MapPage = () => {
               <div className="col-12 d-flex flex-column gap-5">
                    <div className="bg-light p-4 rounded shadow-sm border w-100">
                       <h6 className="fw-bold mb-4 d-flex align-items-center gap-2">
-                        <FaChartArea className="text-primary"/> 1. Key Climate Variables Over Time (1990-2024)
+                        <FaChartArea className="text-primary"/> 1. Key Climate Variables Over Time ({startYear}-{new Date().getFullYear()})
                       </h6>
                       {chartType === 'line' ? <Line 
                         data={{
@@ -542,13 +542,16 @@ const MapPage = () => {
                               label: "Rain (mm)", 
                               data: historicalAnalysis.raw.precipitation_sum?.filter((_, i) => i % 365 === 0) || [], 
                               backgroundColor: "rgba(13, 110, 253, 0.1)", borderColor: "#0d6efd", fill: true, yAxisID: 'y1', tension: 0.3
-                            },
-                            {
-                              label: "Humidity (%)",
-                              data: historicalAnalysis.raw.humidity_2m_mean?.filter((_, i) => i % 365 === 0),
-                              borderColor: "#198754", borderDash: [5,5], yAxisID: 'y', tension: 0.3
                             }
-                          ]
+                          ].concat(
+                            historicalAnalysis.raw.humidity_2m_mean?.some(v => v !== null) 
+                            ? [{
+                                label: "Humidity (%)",
+                                data: historicalAnalysis.raw.humidity_2m_mean?.filter((_, i) => i % 365 === 0),
+                                borderColor: "#198754", borderDash: [5,5], yAxisID: 'y', tension: 0.3
+                              }] 
+                            : []
+                          )
                         }}
                         options={{
                           responsive: true,
@@ -662,7 +665,14 @@ const MapPage = () => {
                       <div className="p-4 rounded shadow-sm border h-100 bg-white d-flex flex-column justify-content-center">
                         <h5 className="fw-bold text-primary mb-3"><FaChartLine className="me-2"/> Trend Summary Card</h5>
                         <div className="display-6 fw-bold mb-2">+{historicalAnalysis.insights?.tempTrend ?? '0'}°C</div>
-                        <p className="text-muted">Over the last {new Date().getFullYear() - startYear} years, {locationName.split(',')[0]} has seen a persistent warming trend. Rainfall anomalies of {historicalAnalysis.insights?.rainAnomaly ?? '0'}% suggest {Math.abs(historicalAnalysis.insights?.rainAnomaly ?? 0) > 10 ? 'significant' : 'minor'} deviation from 20th-century norms.</p>
+                        <p className="text-muted mb-3">
+                          Over the last {new Date().getFullYear() - startYear} years, {locationName.split(',')[0]} has seen a persistent warming trend. 
+                          Rainfall anomalies of {historicalAnalysis.insights?.rainAnomaly ?? '0'}% suggest {Math.abs(historicalAnalysis.insights?.rainAnomaly ?? 0) > 10 ? 'significant' : 'minor'} deviation from norms.
+                        </p>
+                        <div className="d-flex flex-column gap-2 mb-3">
+                          <div className="small"><strong>Max Daily Rainfall:</strong> {historicalAnalysis.insights?.maxDailyRain} mm</div>
+                          <div className="small"><strong>Extreme Days (R95p):</strong> {historicalAnalysis.insights?.extremeRainCount} occurrences ({historicalAnalysis.insights?.extremeRainFrequency}%)</div>
+                        </div>
                         <div className="badge bg-soft-primary text-primary p-2 align-self-start">Anomaly Detected: {historicalAnalysis.insights?.rainAnomaly ?? '0'}%</div>
                       </div>
                     </div>
