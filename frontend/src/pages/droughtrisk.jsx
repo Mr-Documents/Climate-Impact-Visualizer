@@ -35,6 +35,7 @@ const DroughtRiskPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [validationError, setValidationError] = useState(null);
   const [locationError, setLocationError] = useState(null);
+  const [locationName, setLocationName] = useState("Selected Coordinate");
 
   const handleAnalyze = async (lat, lon) => {
     // 1. Validation
@@ -56,6 +57,22 @@ const DroughtRiskPage = () => {
         longitude: lon,
       });
       setData(res.data);
+
+      // Fetch English version of the location name for dual-language display
+      try {
+        const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`;
+        const geoRes = await axios.get(geoUrl, { headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } });
+        const englishName = geoRes.data.display_name?.split(',').slice(0, 3).join(',') || "";
+        const backendName = res.data?.locationName || "Selected Coordinate";
+
+        if (englishName && backendName.toLowerCase() !== englishName.toLowerCase()) {
+          setLocationName(`${backendName} (${englishName})`);
+        } else {
+          setLocationName(backendName);
+        }
+      } catch (geoErr) {
+        setLocationName(res.data?.locationName || "Selected Coordinate");
+      }
       
       if (res.data?.isWater) {
         setLocationError("Analysis Unavailable: The selected location is identified as a water body. Drought risk assessment is not applicable.");
@@ -96,7 +113,6 @@ const DroughtRiskPage = () => {
     
   const weather = data?.weather;
   const history = data?.history;
-  const locationName = data?.locationName || "Selected Coordinate";
 
   const getAIReasoning = (label) => {
     if (isWater) return "Analysis bypassed: Maritime regions do not support terrestrial soil-moisture analysis.";
