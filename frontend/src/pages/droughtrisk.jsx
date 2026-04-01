@@ -52,26 +52,29 @@ const DroughtRiskPage = () => {
     setLocationError(null);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/predict", {
-        latitude: lat,
-        longitude: lon,
+      // Trigger both requests simultaneously
+      const predictionPromise = axios.post("http://localhost:5000/api/predict", {
+        latitude: lat, longitude: lon,
       });
+
+      const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`;
+      const geoPromise = axios.get(geoUrl, { headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } });
+
+      const [res, geoRes] = await Promise.all([
+        predictionPromise,
+        geoPromise.catch(() => null) // Ensure geocoding errors don't block the AI result
+      ]);
+
       setData(res.data);
 
-      // Fetch English version of the location name for dual-language display
-      try {
-        const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`;
-        const geoRes = await axios.get(geoUrl, { headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } });
-        const englishName = geoRes.data.display_name?.split(',').slice(0, 3).join(',') || "";
-        const backendName = res.data?.locationName || "Selected Coordinate";
+      // Logic to show local name + English name in brackets
+      const englishName = geoRes?.data?.display_name?.split(',').slice(0, 3).join(',') || "";
+      const backendName = res.data?.locationName || "Selected Coordinate";
 
-        if (englishName && backendName.toLowerCase() !== englishName.toLowerCase()) {
-          setLocationName(`${backendName} (${englishName})`);
-        } else {
-          setLocationName(backendName);
-        }
-      } catch (geoErr) {
-        setLocationName(res.data?.locationName || "Selected Coordinate");
+      if (englishName && backendName.toLowerCase() !== englishName.toLowerCase()) {
+        setLocationName(`${backendName} (${englishName})`);
+      } else {
+        setLocationName(backendName);
       }
       
       if (res.data?.isWater) {
