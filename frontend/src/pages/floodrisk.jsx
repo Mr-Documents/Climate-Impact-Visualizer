@@ -178,11 +178,17 @@ const FloodRiskPage = () => {
   };
 
   const chartData = history ? {
-    labels: history.time.map(t => {
-      // Fix for NaN hours: ensures parsing works for multiple timestamp formats
-      const d = typeof t === 'number' && t < 1000 ? new Date().setHours(t, 0, 0, 0) : new Date(t);
-      const dateObj = new Date(d);
-      return isNaN(dateObj.getTime()) ? 'N/A' : `${dateObj.getHours()}:00`;
+    labels: history.time.map((t, i) => {
+      // Attempt to parse; replace space with 'T' for better ISO compatibility
+      let dateObj = new Date(typeof t === 'string' ? t.replace(' ', 'T') : t);
+      
+      if (isNaN(dateObj.getTime())) {
+        // Fallback: Generate labels for the past 24h based on current system time
+        dateObj = new Date();
+        dateObj.setMinutes(0, 0, 0);
+        dateObj.setHours(dateObj.getHours() - (history.time.length - 1 - i));
+      }
+      return `${dateObj.getHours().toString().padStart(2, '0')}:00`;
     }),
     datasets: [
       {
