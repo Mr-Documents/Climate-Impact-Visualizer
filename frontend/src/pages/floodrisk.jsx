@@ -188,7 +188,8 @@ const FloodRiskPage = () => {
         dateObj.setMinutes(0, 0, 0);
         dateObj.setHours(dateObj.getHours() - (history.time.length - 1 - i));
       }
-      return `${dateObj.getHours().toString().padStart(2, '0')}:00`;
+      const hour = dateObj.getHours().toString().padStart(2, '0');
+      return `${dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${hour}:00`;
     }),
     datasets: [
       {
