@@ -66,6 +66,8 @@ const FloodRiskPage = () => {
         geoPromise.catch(() => null) // Ensure geocoding errors don't block the AI result
       ]);
 
+      console.log("FloodRisk - Backend prediction response:", response.data);
+      console.log("FloodRisk - Nominatim geocoding response:", geoRes?.data);
       setData(response.data);
 
       // Logic to show local name + English name in brackets
@@ -123,10 +125,13 @@ const FloodRiskPage = () => {
   const isWater = data?.isWater || false;
   const rawPrediction = data?.prediction?.flood;
 
-  // If water, override prediction values
-  const floodPrediction = isWater
-    ? { label: 'N/A', score: 0 }
-    : (data ? rawPrediction : { label: 'N/A', score: 0 }); // Explicitly set to N/A if no data
+  const floodPrediction = React.useMemo(() => {
+    if (isWater) return { label: 'N/A', score: 0 };
+    if (loading) return { label: '--', score: 0 };
+    if (!data) return { label: 'N/A', score: 0 };
+    console.log("FloodRisk - floodPrediction useMemo - data:", data, "isWater:", isWater, "loading:", loading, "rawPrediction:", rawPrediction);
+    return rawPrediction || { label: '--', score: 0 };
+  }, [data, isWater, loading, rawPrediction]);
 
   const weather = data?.weather;
   const history = data?.history;
@@ -173,7 +178,12 @@ const FloodRiskPage = () => {
   };
 
   const chartData = history ? {
-    labels: history.time,
+    labels: history.time.map(t => {
+      // Fix for NaN hours: ensures parsing works for multiple timestamp formats
+      const d = typeof t === 'number' && t < 1000 ? new Date().setHours(t, 0, 0, 0) : new Date(t);
+      const dateObj = new Date(d);
+      return isNaN(dateObj.getTime()) ? 'N/A' : `${dateObj.getHours()}:00`;
+    }),
     datasets: [
       {
         label: 'Precipitation (mm)',
@@ -318,7 +328,7 @@ const FloodRiskPage = () => {
               <ResultCard
                 title="Prediction Result"
                 icon={<WeatherIcon type="flood" size={28} />}
-                color={getRiskColor(floodPrediction.label)}
+                color={getRiskColor(floodPrediction?.label)}
               >
                 <div className="row text-center">
                   <div className="col-12">

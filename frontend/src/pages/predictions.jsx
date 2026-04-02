@@ -3,16 +3,18 @@ import CoordinateForm from "../components/forms/coordinateform";
 import ResultCard from "../components/reusable/resultcard";
 import WeatherIcon from "../components/ui/weathericon";
 import axios from "axios";
-import { FaChartLine } from "react-icons/fa";
+import { FaChartLine, FaExclamationTriangle } from "react-icons/fa";
 
 const PredictionsPage = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useState(null);
+  const [predictionError, setPredictionError] = useState(null);
 
   const handleAnalyze = async (lat, lon) => {
     setCoords({ lat, lon });
     setLoading(true);
+    setPredictionError(null);
     setPrediction(null);
 
     try {
@@ -24,7 +26,8 @@ const PredictionsPage = () => {
       setPrediction(res.data?.prediction ?? null);
     } catch (err) {
       console.error("Predictions error:", err);
-      alert("Failed to retrieve predictions.");
+      setPredictionError("Failed to retrieve predictions. Please ensure the backend is running and try again.");
+      setPrediction(null); // Clear previous prediction on error
     } finally {
       setLoading(false);
     }
@@ -55,6 +58,11 @@ const PredictionsPage = () => {
         </div>
       )}
 
+      {predictionError && (
+        <div className="alert alert-danger mt-3 mb-0 small d-flex align-items-center gap-2">
+          <FaExclamationTriangle /> {predictionError}
+        </div>
+      )}
       {prediction && (
         <ResultCard
           title="Model Predictions"

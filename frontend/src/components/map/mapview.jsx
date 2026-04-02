@@ -4,13 +4,17 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-lea
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
+// Import marker assets directly for better bundler compatibility
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerIconRetina from "leaflet/dist/images/marker-icon-2x.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
 // Fix marker icon issue with Leaflet in React
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require("leaflet/dist/images/marker-icon-2x.png"),
-  iconUrl: require("leaflet/dist/images/marker-icon.png"),
-  shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
+  iconRetinaUrl: markerIconRetina,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
 });
 
 // Helper component to update map center when lat/lon props change from external inputs
@@ -35,12 +39,14 @@ function ClickableMarker({ onSelect, initialPosition }) {
   // Sync internal marker position when parent coordinates change (e.g., after search)
   useEffect(() => {
     setPosition(initialPosition);
-  }, [initialPosition]);
+  }, [initialPosition[0], initialPosition[1]]); // Use primitive parts to avoid array reference issues
 
   useMapEvents({
     click(e) {
       if (!onSelect) return;
-      const { lat, lng } = e.latlng;
+      // Normalize longitude to -180 to 180 range to prevent backend errors/N/A
+      const wrapped = e.latlng.wrap();
+      const { lat, lng } = wrapped;
       setPosition([lat, lng]);
       onSelect(lat, lng);
     },

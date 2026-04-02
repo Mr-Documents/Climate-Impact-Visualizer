@@ -1,21 +1,25 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { FaHistory } from "react-icons/fa";
+import { FaHistory, FaExclamationTriangle } from "react-icons/fa";
 
 const HistoricalDataPage = () => {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState(null);
+  const [historyError, setHistoryError] = useState(null);
+
 
   const fetchHistory = async () => {
     setLoading(true);
     setHistory(null);
+    setHistoryError(null);
 
     try {
       const res = await axios.get("http://localhost:5000/api/precipitation?historic=true");
       setHistory(res.data);
     } catch (err) {
       console.error("Historical data error:", err);
-      alert("Failed to load historical data.");
+      setHistoryError("Failed to load historical data. Please ensure the backend is running and try again.");
+      setHistory(null); // Clear previous history on error
     } finally {
       setLoading(false);
     }
@@ -42,6 +46,11 @@ const HistoricalDataPage = () => {
         </pre>
       ) : (
         <div className="text-muted">Click the button above to fetch history from the API.</div>
+      )}
+      {historyError && (
+        <div className="alert alert-danger mt-3 mb-0 small d-flex align-items-center gap-2">
+          <FaExclamationTriangle /> {historyError}
+        </div>
       )}
     </div>
   );

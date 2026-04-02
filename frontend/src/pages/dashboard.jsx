@@ -661,7 +661,10 @@ const Dashboard = () => {
                 <div className="rounded-circle bg-white bg-opacity-25 p-3"><FaRobot size={24} /></div>
                 <div>
                   <h5 className="mb-0 fw-bold"> Location Intelligence</h5>
-                  <div className="small opacity-75"><FaMapMarkerAlt size={12}/> {locationName}</div>
+                  <div className="small opacity-75 d-flex align-items-center gap-1">
+                    <FaMapMarkerAlt size={12}/> 
+                    <span>{loading ? "Locating..." : locationName}</span>
+                  </div>
                 </div>
               </div>
               <div className="bg-white bg-opacity-10 rounded-3 p-3 mb-4">

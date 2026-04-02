@@ -29,7 +29,7 @@ ChartJS.register(
 );
 
 const DroughtRiskPage = () => {
-  const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
+  const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870, bounds: null });
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,7 +37,7 @@ const DroughtRiskPage = () => {
   const [locationError, setLocationError] = useState(null);
   const [locationName, setLocationName] = useState("Selected Coordinate");
 
-  const handleAnalyze = async (lat, lon) => {
+  const handleAnalyze = async (lat, lon, bounds = null) => {
     // 1. Validation
     if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
       setValidationError("Invalid coordinates. Latitude must be between -90 and 90, Longitude between -180 and 180.");
@@ -46,7 +46,7 @@ const DroughtRiskPage = () => {
     setValidationError(null);
     setLocationError(null);
 
-    setCoords({ lat, lon });
+    setCoords({ lat, lon, bounds });
     setLoading(true);
     setData(null);
     setLocationError(null);
@@ -65,6 +65,8 @@ const DroughtRiskPage = () => {
         geoPromise.catch(() => null) // Ensure geocoding errors don't block the AI result
       ]);
 
+      console.log("DroughtRisk - Backend prediction response:", res.data);
+      console.log("DroughtRisk - Nominatim geocoding response:", geoRes?.data);
       setData(res.data);
 
       // Logic to show local name + English name in brackets
@@ -98,8 +100,12 @@ const DroughtRiskPage = () => {
     try {
       const res = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
       if (res.data && res.data.length > 0) {
-        const { lat, lon } = res.data[0];
-        handleAnalyze(parseFloat(lat), parseFloat(lon));
+        const { lat, lon, boundingbox } = res.data[0];
+        const bounds = boundingbox ? [
+          [parseFloat(boundingbox[0]), parseFloat(boundingbox[2])],
+          [parseFloat(boundingbox[1]), parseFloat(boundingbox[3])]
+        ] : null;
+        handleAnalyze(parseFloat(lat), parseFloat(lon), bounds);
         setSearchQuery("");
       } else {
         setLocationError("Location not found. Please check the spelling or try a different area name.");
@@ -115,9 +121,14 @@ const DroughtRiskPage = () => {
 
   const isWater = data?.isWater || false;
   const rawPrediction = data?.prediction?.drought; // This will be undefined if data is null
-  const droughtPrediction = isWater
-    ? { label: 'N/A', score: 0 }
-    : (data ? rawPrediction : { label: 'N/A', score: 0 }); // Explicitly set to N/A if no data
+
+  const droughtPrediction = React.useMemo(() => {
+    if (isWater) return { label: 'N/A', score: 0 };
+    if (loading) return { label: '--', score: 0 };
+    if (!data) return { label: 'N/A', score: 0 };
+    console.log("DroughtRisk - droughtPrediction useMemo - data:", data, "isWater:", isWater, "loading:", loading, "rawPrediction:", rawPrediction);
+    return rawPrediction || { label: '--', score: 0 };
+  }, [data, isWater, loading, rawPrediction]);
     
   const weather = data?.weather;
   const history = data?.history;
@@ -163,7 +174,12 @@ const DroughtRiskPage = () => {
   };
 
   const chartData = history ? {
-    labels: history.time,
+    labels: history.time.map(t => {
+      // Handle both ISO strings and raw numeric offsets/timestamps
+      const d = typeof t === 'number' && t < 1000 ? new Date().setHours(t, 0, 0, 0) : new Date(t);
+      const dateObj = new Date(d);
+      return isNaN(dateObj.getTime()) ? 'N/A' : `${dateObj.getHours()}:00`;
+    }),
     datasets: [
       {
         label: 'Temperature (°C)',
@@ -266,6 +282,7 @@ const DroughtRiskPage = () => {
             <UnifiedMap
               lat={coords.lat}
               lon={coords.lon}
+              bounds={coords.bounds}
               onSelect={(lat, lon) => handleAnalyze(lat, lon)}
             >
               {!loading && !isWater && droughtPrediction?.label === 'High' && (
@@ -307,7 +324,7 @@ const DroughtRiskPage = () => {
               <ResultCard
                 title="Prediction Result"
                 icon={<WeatherIcon type="drought" size={28} />}
-                color={getRiskColor(droughtPrediction?.label)}
+                color={getRiskColor(droughtPrediction.label)}
               >
                 <div className="row text-center">
                   <div className="col-12">
