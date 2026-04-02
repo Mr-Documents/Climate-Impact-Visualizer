@@ -129,7 +129,7 @@ function MapOverlays({ center, layers }) {
 }
 
 const Dashboard = () => {
-  const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
+  const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870, bounds: null });
   const [locationName, setLocationName] = useState("Accra, Ghana");
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -230,8 +230,12 @@ const Dashboard = () => {
     try {
       const res = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
       if (res.data && res.data.length > 0) {
-        const { lat, lon } = res.data[0];
-        setCoords({ lat: parseFloat(lat), lon: parseFloat(lon) });
+        const { lat, lon, boundingbox } = res.data[0];
+        const bounds = boundingbox ? [
+          [parseFloat(boundingbox[0]), parseFloat(boundingbox[2])],
+          [parseFloat(boundingbox[1]), parseFloat(boundingbox[3])]
+        ] : null;
+        setCoords({ lat: parseFloat(lat), lon: parseFloat(lon), bounds });
         setSearchQuery("");
       } else {
         setLocationError("Location name not found. Please try a more specific area name.");
@@ -759,6 +763,7 @@ const Dashboard = () => {
               <UnifiedMap
                 lat={coords.lat}
                 lon={coords.lon}
+                bounds={coords.bounds}
                 onSelect={(lat, lon) => setCoords({ lat, lon })}
               >
                 <MapOverlays center={[coords.lat, coords.lon]} layers={mapLayers} />

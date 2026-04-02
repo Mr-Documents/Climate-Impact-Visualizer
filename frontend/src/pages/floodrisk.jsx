@@ -29,7 +29,7 @@ ChartJS.register(
 );
 
 const FloodRiskPage = () => {
-  const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
+  const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870, bounds: null });
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,7 +37,7 @@ const FloodRiskPage = () => {
   const [locationError, setLocationError] = useState(null);
   const [locationName, setLocationName] = useState("Selected Coordinate");
 
-  const handleAnalyze = async (lat, lon) => {
+  const handleAnalyze = async (lat, lon, bounds = null) => {
     // 1. Validation
     if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
       setValidationError("Invalid coordinates. Latitude must be between -90 and 90, Longitude between -180 and 180.");
@@ -46,7 +46,7 @@ const FloodRiskPage = () => {
     setValidationError(null);
     setLocationError(null);
 
-    setCoords({ lat, lon });
+    setCoords({ lat, lon, bounds });
     setLoading(true);
     setData(null);
     setLocationError(null);
@@ -100,8 +100,12 @@ const FloodRiskPage = () => {
     try {
       const res = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
       if (res.data && res.data.length > 0) {
-        const { lat, lon } = res.data[0];
-        handleAnalyze(parseFloat(lat), parseFloat(lon));
+        const { lat, lon, boundingbox } = res.data[0];
+        const bounds = boundingbox ? [
+          [parseFloat(boundingbox[0]), parseFloat(boundingbox[2])],
+          [parseFloat(boundingbox[1]), parseFloat(boundingbox[3])]
+        ] : null;
+        handleAnalyze(parseFloat(lat), parseFloat(lon), bounds);
         setSearchQuery("");
       } else {
         setLocationError("Location name not found. Please try a different search term.");
@@ -272,6 +276,7 @@ const FloodRiskPage = () => {
             <UnifiedMap
               lat={coords.lat}
               lon={coords.lon}
+              bounds={coords.bounds}
               onSelect={(lat, lon) => handleAnalyze(lat, lon)}
             >
               {!loading && !isWater && floodPrediction?.label === 'High' && (

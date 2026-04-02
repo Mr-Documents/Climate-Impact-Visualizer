@@ -14,11 +14,17 @@ L.Icon.Default.mergeOptions({
 });
 
 // Helper component to update map center when lat/lon props change from external inputs
-function MapRecenter({ lat, lon }) {
+function MapRecenter({ lat, lon, bounds }) {
   const map = useMap();
   useEffect(() => {
-    map.setView([lat, lon], map.getZoom());
-  }, [lat, lon, map]);
+    if (bounds) {
+      map.flyToBounds(bounds, { padding: [20, 20], duration: 1.5 });
+    } else {
+      // Smoothly fly to point; if zoomed out too far, zoom in to a reasonable level
+      const targetZoom = map.getZoom() < 7 ? 10 : map.getZoom();
+      map.flyTo([lat, lon], targetZoom, { duration: 1.5 });
+    }
+  }, [lat, lon, bounds, map]);
   return null;
 }
 
@@ -48,14 +54,15 @@ function ClickableMarker({ onSelect, initialPosition }) {
  * UnifiedMap Component
  * @param {number} lat - initial latitude
  * @param {number} lon - initial longitude
+ * @param {Array} bounds - optional geographic boundaries [[minLat, minLon], [maxLat, maxLon]]
  * @param {function} onSelect - optional callback when user clicks map
  * @param {ReactNode} children - optional overlays like FireSimulation / DrynessHeatmap
  */
-function UnifiedMap({ lat = 5.6037, lon = -0.1870, onSelect, children }) {
+function UnifiedMap({ lat = 5.6037, lon = -0.1870, bounds, onSelect, children }) {
   return (
     <div style={{ height: "400px", width: "100%", marginTop: "20px" }}>
       <MapContainer center={[lat, lon]} zoom={7} style={{ height: "100%", width: "100%" }} attributionControl={false}>
-        <MapRecenter lat={lat} lon={lon} />
+        <MapRecenter lat={lat} lon={lon} bounds={bounds} />
         <TileLayer
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
           attribution=''
