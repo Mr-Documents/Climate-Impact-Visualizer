@@ -136,17 +136,6 @@ const Dashboard = () => {
   const [isWaterBody, setIsWaterBody] = useState(false);
   const [recentSnapshot, setRecentSnapshot] = useState(null);
 
-  const fetchLocationName = useCallback(async (lat, lon) => {
-    try {
-      const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`;
-      const res = await axios.get(geoUrl, { headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } });
-      const name = res.data.display_name?.split(',').slice(0, 3).join(',') || "Selected Location";
-      setLocationName(name);
-    } catch (err) {
-      console.error("Geocoding failed", err);
-    }
-  }, []);
-
   const [currentWeather, setCurrentWeather] = useState({
     temperature: null,
     maxTemp: null,
@@ -234,6 +223,8 @@ const Dashboard = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setLoading(true);
+    setFloodRisk("N/A");
+    setDroughtRisk("N/A");
     setLocationError(null);
     setValidationError(null);
     try {
@@ -244,9 +235,13 @@ const Dashboard = () => {
         setSearchQuery("");
       } else {
         setLocationError("Location name not found. Please try a more specific area name.");
+        setFloodRisk("N/A");
+        setDroughtRisk("N/A");
       }
     } catch (err) {
       setLocationError("Could not connect to the location service. Please verify your connection.");
+      setFloodRisk("N/A");
+      setDroughtRisk("N/A");
     } finally {
       setLoading(false);
     }
@@ -331,9 +326,12 @@ const Dashboard = () => {
       setLocationError(null);
       try {
         // rainRes (precipitation endpoint) and weatherRes (weather endpoint) now return past+future data
-        const [weatherRes, predictionRes] = await Promise.all([
+        const [weatherRes, predictionRes, geoRes] = await Promise.all([
           axios.get(`http://localhost:5000/api/weather?lat=${lat}&lon=${lon}`),
           axios.post(`http://localhost:5000/api/predict`, { latitude: lat, longitude: lon }),
+          axios.get(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`, { 
+            headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } 
+          }).catch(() => null)
         ]);
 
         // --- Weather ---
@@ -389,7 +387,16 @@ const Dashboard = () => {
         
         // Capture 30-day snapshot and location name from the prediction response
         if (predictionRes.data?.recentSnapshot) setRecentSnapshot(predictionRes.data.recentSnapshot);
-        if (predictionRes.data?.locationName) setLocationName(predictionRes.data.locationName);
+
+        // Dual-language logic for Location Intelligence
+        const englishName = geoRes?.data?.display_name?.split(',').slice(0, 3).join(',') || "";
+        const backendName = predictionRes.data?.locationName || "Selected Location";
+
+        if (englishName && backendName.toLowerCase() !== englishName.toLowerCase()) {
+          setLocationName(`${backendName} (${englishName})`);
+        } else {
+          setLocationName(backendName);
+        }
 
         const predictionData = predictionRes.data?.prediction || {};
         
@@ -427,7 +434,11 @@ const Dashboard = () => {
         refreshAlerts(nextWeatherSummary, floodLabel, droughtLabel);
       } catch (error) {
         console.error("Dashboard fetch error:", error);
-        // alert("Dashboard data failed to load."); 
+        setFloodRisk("N/A");
+        setDroughtRisk("N/A");
+        setFloodScore(0);
+        setDroughtScore(0);
+        setLocationError("Regional analysis unavailable: Prediction models encountered a processing error.");
       } finally {
         setLoading(false);
       }
@@ -437,8 +448,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchAllData(coords.lat, coords.lon);
-    fetchLocationName(coords.lat, coords.lon);
-  }, [coords.lat, coords.lon, fetchAllData, fetchLocationName]);
+  }, [coords.lat, coords.lon, fetchAllData]);
 
   const kpiCards = [
     {

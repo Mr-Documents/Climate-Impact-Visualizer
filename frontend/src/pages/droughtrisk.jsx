@@ -82,7 +82,8 @@ const DroughtRiskPage = () => {
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to analyze drought risk");
+      setLocationError("System Error: Failed to retrieve drought risk prediction. Please try again.");
+      setData(null); // Resets predictions to N/A
     } finally {
       setLoading(false);
     }
