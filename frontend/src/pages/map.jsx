@@ -18,6 +18,7 @@ import {
   FaHistory,
   FaChartLine,
   FaChartArea,
+  FaExclamationTriangle,
   FaExclamationCircle,
   FaThermometerHalf
 } from "react-icons/fa";
@@ -98,6 +99,7 @@ const MapPage = () => {
     airQuality: null,
     uvDryness: null,
   });
+  const [locationError, setLocationError] = useState(null);
   const [activeOverlays, setActiveOverlays] = useState([]);
   const [historicalAnalysis, setHistoricalAnalysis] = useState(null);
   const [histError, setHistError] = useState(null);
@@ -132,6 +134,7 @@ const MapPage = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setLoading(true);
+    setLocationError(null);
     try {
       const res = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
       if (res.data && res.data.length > 0) {
@@ -139,10 +142,10 @@ const MapPage = () => {
         setCoords({ lat: parseFloat(lat), lon: parseFloat(lon) });
         setSearchQuery("");
       } else {
-        alert("Location not found. Please try a different name.");
+        setLocationError("Location not found. Please check the spelling or try a different area.");
       }
     } catch (err) {
-      console.error("Search failed", err);
+      setLocationError("An error occurred while searching for the location.");
     } finally {
       setLoading(false);
     }
@@ -324,11 +327,19 @@ const MapPage = () => {
           </form>
           <div className="text-muted small mb-2">Or enter coordinates manually:</div>
           <CoordinateForm
-            onSubmit={(lat, lon) => setCoords({ lat: Number(lat), lon: Number(lon) })}
+            onSubmit={(lat, lon) => {
+              setLocationError(null);
+              setCoords({ lat: Number(lat), lon: Number(lon) });
+            }}
             loading={loading}
             buttonText="Update Overview"
             buttonColor="primary"
           />
+          {locationError && (
+            <div className="alert alert-warning mt-3 mb-0 small d-flex align-items-center gap-2">
+              <FaExclamationTriangle /> {locationError}
+            </div>
+          )}
         </div>
       </div>
 
@@ -340,7 +351,10 @@ const MapPage = () => {
               <UnifiedMap
                 lat={coords.lat}
                 lon={coords.lon}
-                onSelect={(lat, lon) => setCoords({ lat, lon })}
+                onSelect={(lat, lon) => {
+                  setLocationError(null);
+                  setCoords({ lat, lon });
+                }}
               >
                 {activeOverlays.map((key) => (
                   <TileLayer

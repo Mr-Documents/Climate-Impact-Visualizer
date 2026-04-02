@@ -234,6 +234,8 @@ const Dashboard = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setLoading(true);
+    setLocationError(null);
+    setValidationError(null);
     try {
       const res = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
       if (res.data && res.data.length > 0) {
@@ -241,10 +243,10 @@ const Dashboard = () => {
         setCoords({ lat: parseFloat(lat), lon: parseFloat(lon) });
         setSearchQuery("");
       } else {
-        alert("Location name not found.");
+        setLocationError("Location name not found. Please try a more specific area name.");
       }
     } catch (err) {
-      console.error("Geocoding search failed", err);
+      setLocationError("Could not connect to the location service. Please verify your connection.");
     } finally {
       setLoading(false);
     }
@@ -532,7 +534,7 @@ const Dashboard = () => {
         )}
         {locationError && (
           <div className="alert alert-warning mt-3 mb-0 d-flex align-items-center gap-2">
-            <FaWater /> <strong>Invalid Terrain:</strong> {locationError}
+            <FaExclamationTriangle /> {locationError}
           </div>
         )}
       </div>

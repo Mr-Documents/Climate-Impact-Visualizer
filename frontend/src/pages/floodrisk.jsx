@@ -52,27 +52,30 @@ const FloodRiskPage = () => {
     setLocationError(null);
 
     try {
-      // Using the trained model endpoint
-      const response = await axios.post("http://localhost:5000/api/predict", {
-        latitude: lat,
-        longitude: lon,
+      // Start both requests in parallel
+      const predictionPromise = axios.post("http://localhost:5000/api/predict", {
+        latitude: lat, longitude: lon,
       });
+
+      const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`;
+      const geoPromise = axios.get(geoUrl, { headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } });
+
+      // Wait for both to complete
+      const [response, geoRes] = await Promise.all([
+        predictionPromise,
+        geoPromise.catch(() => null) // Ensure geocoding errors don't block the AI result
+      ]);
+
       setData(response.data);
 
-      // Fetch English version of the location name for dual-language display
-      try {
-        const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`;
-        const geoRes = await axios.get(geoUrl, { headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } });
-        const englishName = geoRes.data.display_name?.split(',').slice(0, 3).join(',') || "";
-        const backendName = response.data?.locationName || "Selected Coordinate";
+      // Logic to show local name + English name in brackets
+      const englishName = geoRes?.data?.display_name?.split(',').slice(0, 3).join(',') || "";
+      const backendName = response.data?.locationName || "Selected Coordinate";
 
-        if (englishName && backendName.toLowerCase() !== englishName.toLowerCase()) {
-          setLocationName(`${backendName} (${englishName})`);
-        } else {
-          setLocationName(backendName);
-        }
-      } catch (geoErr) {
-        setLocationName(response.data?.locationName || "Selected Coordinate");
+      if (englishName && backendName.toLowerCase() !== englishName.toLowerCase()) {
+        setLocationName(`${backendName} (${englishName})`);
+      } else {
+        setLocationName(backendName);
       }
 
       // 2. Check for Water Body
@@ -81,7 +84,8 @@ const FloodRiskPage = () => {
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to analyze flood risk");
+      setLocationError("Failed to analyze flood risk. Please try again."); // Use in-app error message
+      setData(null); // Crucial: Reset data to trigger N/A
     } finally {
       setLoading(false);
     }
@@ -91,6 +95,8 @@ const FloodRiskPage = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setLoading(true);
+    setData(null); // Clear previous data on new search
+    setLocationError(null);
     try {
       const res = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
       if (res.data && res.data.length > 0) {
@@ -98,10 +104,12 @@ const FloodRiskPage = () => {
         handleAnalyze(parseFloat(lat), parseFloat(lon));
         setSearchQuery("");
       } else {
-        alert("Area not found.");
+        setLocationError("Location name not found. Please try a different search term.");
+        setData(null); // Clear data if location not found
       }
     } catch (err) {
-      console.error("Search error", err);
+      setLocationError("Unable to reach the location service. Please verify your connection.");
+      setData(null); // Clear data if search service fails
     } finally {
       setLoading(false);
     }
@@ -110,11 +118,11 @@ const FloodRiskPage = () => {
   // Derived state for display
   const isWater = data?.isWater || false;
   const rawPrediction = data?.prediction?.flood;
-  
+
   // If water, override prediction values
-  const floodPrediction = isWater 
-    ? { label: 'N/A', score: 0 } 
-    : rawPrediction;
+  const floodPrediction = isWater
+    ? { label: 'N/A', score: 0 }
+    : (data ? rawPrediction : { label: 'N/A', score: 0 }); // Explicitly set to N/A if no data
 
   const weather = data?.weather;
   const history = data?.history;
@@ -257,7 +265,7 @@ const FloodRiskPage = () => {
           )}
           {locationError && (
             <div className="alert alert-warning mt-3 mb-0 small d-flex align-items-center gap-2">
-              <FaWater /> {locationError}
+              <FaExclamationTriangle /> {locationError}
             </div>
           )}
           <div className="mt-3">

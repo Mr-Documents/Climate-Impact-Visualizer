@@ -92,6 +92,8 @@ const DroughtRiskPage = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setLoading(true);
+    setData(null); // Clear previous data on new search
+    setLocationError(null);
     try {
       const res = await axios.get(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
       if (res.data && res.data.length > 0) {
@@ -99,20 +101,22 @@ const DroughtRiskPage = () => {
         handleAnalyze(parseFloat(lat), parseFloat(lon));
         setSearchQuery("");
       } else {
-        alert("Location not found.");
+        setLocationError("Location not found. Please check the spelling or try a different area name.");
+        setData(null); // Clear data if location not found
       }
     } catch (err) {
-      console.error("Search failed", err);
+      setLocationError("Location service is currently unavailable. Please try again later.");
+      setData(null); // Clear data if search service fails
     } finally {
       setLoading(false);
     }
   };
 
   const isWater = data?.isWater || false;
-  const rawPrediction = data?.prediction?.drought;
-  const droughtPrediction = isWater 
-    ? { label: 'N/A', score: 0 } 
-    : rawPrediction;
+  const rawPrediction = data?.prediction?.drought; // This will be undefined if data is null
+  const droughtPrediction = isWater
+    ? { label: 'N/A', score: 0 }
+    : (data ? rawPrediction : { label: 'N/A', score: 0 }); // Explicitly set to N/A if no data
     
   const weather = data?.weather;
   const history = data?.history;
@@ -254,7 +258,7 @@ const DroughtRiskPage = () => {
           )}
           {locationError && (
             <div className="alert alert-warning mt-3 mb-0 small d-flex align-items-center gap-2">
-              <FaWater /> {locationError}
+              <FaExclamationTriangle /> {locationError}
             </div>
           )}
           <div className="mt-3">
