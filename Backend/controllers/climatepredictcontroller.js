@@ -184,8 +184,8 @@ export async function getHistoricalAnalysis(req, res) {
     const end_date = date.toISOString().split('T')[0];
     const start_date = `${start_year}-01-01`;
 
-    // Fixed: Removed relative_humidity_2m_mean as it is not supported by the Archive API daily endpoint
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start_date}&end_date=${end_date}&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
+    // Added shortwave_radiation_sum for solar radiation analysis
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start_date}&end_date=${end_date}&daily=temperature_2m_mean,precipitation_sum,shortwave_radiation_sum&timezone=auto`;
     
     const response = await fetch(url);
     const data = await response.json();
@@ -271,7 +271,8 @@ export async function getHistoricalAnalysis(req, res) {
     const result = {
       raw: {
         ...data.daily,
-        humidity_2m_mean: Array(n).fill(null) // Archive API doesn't provide daily mean humidity
+        humidity_2m_mean: Array(n).fill(null), // Archive API doesn't provide daily mean humidity
+        shortwave_radiation_sum: data.daily.shortwave_radiation_sum || []
       },
       insights: {
         tempTrend: (slope * n).toFixed(2),

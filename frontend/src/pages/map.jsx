@@ -20,7 +20,8 @@ import {
   FaChartArea,
   FaExclamationTriangle,
   FaExclamationCircle,
-  FaThermometerHalf
+  FaThermometerHalf,
+  FaBolt
 } from "react-icons/fa";
 import ResultCard from "../components/reusable/resultcard"; 
 import { Circle, Popup, Marker, TileLayer } from "react-leaflet";
@@ -253,6 +254,34 @@ const MapPage = () => {
     };
   }, [historicalAnalysis]);
 
+  // New logic to calculate frequency of extreme events per year
+  const extremeTrendData = React.useMemo(() => {
+    if (!historicalAnalysis?.raw?.time) return null;
+    const yearlyStats = {};
+    
+    historicalAnalysis.raw.time.forEach((t, i) => {
+      const year = t.split('-')[0];
+      if (!yearlyStats[year]) yearlyStats[year] = { heat: 0, rain: 0 };
+      
+      // Thresholds: Heatwave (>35°C), Heavy Rain (>50mm)
+      if (historicalAnalysis.raw.temperature_2m_mean?.[i] > 35) yearlyStats[year].heat++;
+      if (historicalAnalysis.raw.precipitation_sum?.[i] > 50) yearlyStats[year].rain++;
+    });
+
+    const labels = Object.keys(yearlyStats);
+    return {
+      labels,
+      heatEvents: labels.map(y => yearlyStats[y].heat),
+      rainEvents: labels.map(y => yearlyStats[y].rain)
+    };
+  }, [historicalAnalysis]);
+
+  // Mock Sea Level Trend (Global Average ~3.3mm/year) for context
+  const calculateSeaLevel = (year) => {
+    const baseYear = 1993;
+    return Math.max(0, (year - baseYear) * 3.3).toFixed(1);
+  };
+
   const extremeEvents = React.useMemo(() => {
     if (!historicalAnalysis?.raw?.time) return [];
     
@@ -475,6 +504,75 @@ const MapPage = () => {
         </div>
       </div>
 
+      {/* EXTREME WEATHER EVENTS SECTION */}
+      <div className="col-12 mt-4">
+        <div className="card shadow-sm border-0 p-4 bg-white">
+           <div className="mb-4">
+              <h4 className="fw-bold mb-1"><FaBolt className="text-warning me-2"/> Extreme Weather Events</h4>
+              <p className="text-muted small">Visualizing the frequency of disaster-level weather patterns to understand climate impact.</p>
+           </div>
+           
+           {histLoading ? (
+             <div className="text-center p-4"><div className="spinner-border text-warning"/></div>
+           ) : extremeTrendData ? (
+             <div className="row g-4">
+               <div className="col-lg-8">
+                 <div className="bg-light p-3 rounded border">
+                   <h6 className="fw-bold mb-3 small text-uppercase">Annual Frequency of Extreme Events</h6>
+                   <div style={{ height: '300px' }}>
+                     <Bar 
+                        data={{
+                          labels: extremeTrendData.labels,
+                          datasets: [
+                            { 
+                              label: "Heatwaves (>35°C Days)", 
+                              data: extremeTrendData.heatEvents, 
+                              backgroundColor: "rgba(220, 53, 69, 0.7)" 
+                            },
+                            { 
+                              label: "Heavy Rainfall (>50mm Days)", 
+                              data: extremeTrendData.rainEvents, 
+                              backgroundColor: "rgba(13, 110, 253, 0.7)" 
+                            }
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          scales: { y: { beginAtZero: true, title: { display: true, text: 'Day Count' } } }
+                        }}
+                     />
+                   </div>
+                 </div>
+               </div>
+               <div className="col-lg-4">
+                 <div className="alert alert-warning border-0 shadow-sm h-100 mb-0">
+                    <h6 className="fw-bold d-flex align-items-center gap-2">
+                      <FaExclamationTriangle /> Disaster Risk Impact
+                    </h6>
+                    <p className="small mb-3">
+                      The visualization tracks the increasing volatility of weather patterns. Significant spikes in "Heatwave Days" often correlate with regional drought onset, while "Heavy Rainfall" frequency impacts urban drainage resilience.
+                    </p>
+                    <hr />
+                    <div className="d-flex flex-column gap-2">
+                      <div className="d-flex justify-content-between small">
+                        <span>Total Extreme Heat Days:</span>
+                        <span className="fw-bold">{extremeTrendData.heatEvents.reduce((a,b) => a+b, 0)}</span>
+                      </div>
+                      <div className="d-flex justify-content-between small">
+                        <span>Total Heavy Rain Days:</span>
+                        <span className="fw-bold">{extremeTrendData.rainEvents.reduce((a,b) => a+b, 0)}</span>
+                      </div>
+                    </div>
+                 </div>
+               </div>
+             </div>
+           ) : (
+             <div className="text-center text-muted p-4">Fetch historical data to view extreme patterns.</div>
+           )}
+        </div>
+      </div>
+
       {/* DEEP HISTORICAL ANALYSIS SECTION */}
       <div className="col-12 mt-4">
         <div className="card shadow-sm border-0 p-4">
@@ -548,14 +646,24 @@ const MapPage = () => {
                           labels: historicalAnalysis.raw.time?.filter((_, i) => i % 365 === 0).map(t => t.split('-')[0]) || [],
                           datasets: [
                             { 
-                              label: "Temp (°C)", 
+                              label: "Temperature (°C)", 
                               data: historicalAnalysis.raw.temperature_2m_mean?.filter((_, i) => i % 365 === 0) || [], 
                               borderColor: "#dc3545", yAxisID: 'y', tension: 0.3
                             },
                             { 
-                              label: "Rain (mm)", 
+                              label: "Rainfall (mm)", 
                               data: historicalAnalysis.raw.precipitation_sum?.filter((_, i) => i % 365 === 0) || [], 
                               backgroundColor: "rgba(13, 110, 253, 0.1)", borderColor: "#0d6efd", fill: true, yAxisID: 'y1', tension: 0.3
+                            },
+                            { 
+                              label: "Solar Radiation (MJ/m²)", 
+                              data: historicalAnalysis.raw.shortwave_radiation_sum?.filter((_, i) => i % 365 === 0) || [], 
+                              borderColor: "#ffc107", yAxisID: 'y', tension: 0.3, borderDash: [3, 3]
+                            },
+                            { 
+                              label: "Sea Level Trend (mm)", 
+                              data: (historicalAnalysis.raw.time?.filter((_, i) => i % 365 === 0) || []).map(t => calculateSeaLevel(parseInt(t.split('-')[0]))), 
+                              borderColor: "#6610f2", yAxisID: 'y1', tension: 0.3, borderDash: [5, 2]
                             }
                           ].concat(
                             historicalAnalysis.raw.humidity_2m_mean?.some(v => v !== null) 
@@ -570,8 +678,8 @@ const MapPage = () => {
                         options={{
                           responsive: true,
                           scales: {
-                            y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp / Humidity' } },
-                            y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Rain (mm)' } }
+                            y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp (°C) / Solar / Humidity' } },
+                            y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Rain / Sea Level (mm)' } }
                           }
                         }}
                       /> : <Bar 
