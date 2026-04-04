@@ -504,75 +504,6 @@ const MapPage = () => {
         </div>
       </div>
 
-      {/* EXTREME WEATHER EVENTS SECTION */}
-      <div className="col-12 mt-4">
-        <div className="card shadow-sm border-0 p-4 bg-white">
-           <div className="mb-4">
-              <h4 className="fw-bold mb-1"><FaBolt className="text-warning me-2"/> Extreme Weather Events</h4>
-              <p className="text-muted small">Visualizing the frequency of disaster-level weather patterns to understand climate impact.</p>
-           </div>
-           
-           {histLoading ? (
-             <div className="text-center p-4"><div className="spinner-border text-warning"/></div>
-           ) : extremeTrendData ? (
-             <div className="row g-4">
-               <div className="col-lg-8">
-                 <div className="bg-light p-3 rounded border">
-                   <h6 className="fw-bold mb-3 small text-uppercase">Annual Frequency of Extreme Events</h6>
-                   <div style={{ height: '300px' }}>
-                     <Bar 
-                        data={{
-                          labels: extremeTrendData.labels,
-                          datasets: [
-                            { 
-                              label: "Heatwaves (>35°C Days)", 
-                              data: extremeTrendData.heatEvents, 
-                              backgroundColor: "rgba(220, 53, 69, 0.7)" 
-                            },
-                            { 
-                              label: "Heavy Rainfall (>50mm Days)", 
-                              data: extremeTrendData.rainEvents, 
-                              backgroundColor: "rgba(13, 110, 253, 0.7)" 
-                            }
-                          ]
-                        }}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          scales: { y: { beginAtZero: true, title: { display: true, text: 'Day Count' } } }
-                        }}
-                     />
-                   </div>
-                 </div>
-               </div>
-               <div className="col-lg-4">
-                 <div className="alert alert-warning border-0 shadow-sm h-100 mb-0">
-                    <h6 className="fw-bold d-flex align-items-center gap-2">
-                      <FaExclamationTriangle /> Disaster Risk Impact
-                    </h6>
-                    <p className="small mb-3">
-                      The visualization tracks the increasing volatility of weather patterns. Significant spikes in "Heatwave Days" often correlate with regional drought onset, while "Heavy Rainfall" frequency impacts urban drainage resilience.
-                    </p>
-                    <hr />
-                    <div className="d-flex flex-column gap-2">
-                      <div className="d-flex justify-content-between small">
-                        <span>Total Extreme Heat Days:</span>
-                        <span className="fw-bold">{extremeTrendData.heatEvents.reduce((a,b) => a+b, 0)}</span>
-                      </div>
-                      <div className="d-flex justify-content-between small">
-                        <span>Total Heavy Rain Days:</span>
-                        <span className="fw-bold">{extremeTrendData.rainEvents.reduce((a,b) => a+b, 0)}</span>
-                      </div>
-                    </div>
-                 </div>
-               </div>
-             </div>
-           ) : (
-             <div className="text-center text-muted p-4">Fetch historical data to view extreme patterns.</div>
-           )}
-        </div>
-      </div>
-
       {/* DEEP HISTORICAL ANALYSIS SECTION */}
       <div className="col-12 mt-4">
         <div className="card shadow-sm border-0 p-4">
@@ -636,6 +567,74 @@ const MapPage = () => {
                     <p className="small mb-0 mt-2">Increasing rainfall variability in {locationName || 'this region'} directly influences our flood and drought risk models.</p>
                  </div>
               </div>
+
+              {/* EXTREME WEATHER EVENTS SECTION - Relocated below KPI cards */}
+              <div className="col-12">
+                <div className="card shadow-sm border-0 p-4 bg-white">
+                   <div className="mb-4">
+                      <h4 className="fw-bold mb-1"><FaBolt className="text-warning me-2"/> Extreme Weather Events</h4>
+                      <p className="text-muted small">Visualizing the frequency of disaster-level weather patterns to understand climate impact.</p>
+                   </div>
+                   
+                   {extremeTrendData ? (
+                     <div className="row g-4">
+                       <div className="col-lg-8">
+                         <div className="bg-light p-3 rounded border">
+                           <h6 className="fw-bold mb-3 small text-uppercase">Annual Frequency of Extreme Events</h6>
+                           <div style={{ height: '300px' }}>
+                             <Bar 
+                                data={{
+                                  labels: extremeTrendData.labels,
+                                  datasets: [
+                                    { 
+                                      label: "Heatwaves (>35°C Days)", 
+                                      data: extremeTrendData.heatEvents, 
+                                      backgroundColor: "rgba(220, 53, 69, 0.7)" 
+                                    },
+                                    { 
+                                      label: "Heavy Rainfall (>50mm Days)", 
+                                      data: extremeTrendData.rainEvents, 
+                                      backgroundColor: "rgba(13, 110, 253, 0.7)" 
+                                    }
+                                  ]
+                                }}
+                                options={{
+                                  responsive: true,
+                                  maintainAspectRatio: false,
+                                  scales: { y: { beginAtZero: true, title: { display: true, text: 'Day Count' } } }
+                                }}
+                             />
+                           </div>
+                         </div>
+                       </div>
+                       <div className="col-lg-4">
+                         <div className="alert alert-warning border-0 shadow-sm h-100 mb-0">
+                            <h6 className="fw-bold d-flex align-items-center gap-2">
+                              <FaExclamationTriangle /> Disaster Risk Impact
+                            </h6>
+                            <p className="small mb-3">
+                              The visualization tracks the increasing volatility of weather patterns. Significant spikes in "Heatwave Days" often correlate with regional drought onset, while "Heavy Rainfall" frequency impacts urban drainage resilience.
+                            </p>
+                            <hr />
+                            <div className="d-flex flex-column gap-2">
+                              <div className="d-flex justify-content-between small">
+                                <span>Total Extreme Heat Days:</span>
+                                <span className="fw-bold">{extremeTrendData.heatEvents.reduce((a,b) => a+b, 0)}</span>
+                              </div>
+                              <div className="d-flex justify-content-between small">
+                                <span>Total Heavy Rain Days:</span>
+                                <span className="fw-bold">{extremeTrendData.rainEvents.reduce((a,b) => a+b, 0)}</span>
+                              </div>
+                            </div>
+                         </div>
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="text-center text-muted p-4">Fetch historical data to view extreme patterns.</div>
+                   )}
+                </div>
+              </div>
+
               <div className="col-12 d-flex flex-column gap-5">
                    <div className="bg-light p-4 rounded shadow-sm border w-100">
                       <h6 className="fw-bold mb-4 d-flex align-items-center gap-2">
