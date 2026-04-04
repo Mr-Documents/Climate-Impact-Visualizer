@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
 import CoordinateForm from "../components/forms/coordinateform";
-import { FaRobot, FaLightbulb, FaMapMarkerAlt } from "react-icons/fa";
+import { FaRobot, FaLightbulb, FaMapMarkerAlt, FaBolt } from "react-icons/fa";
 import { Line } from "react-chartjs-2";
 import { Circle } from "react-leaflet";
 import {
@@ -135,11 +135,13 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isWaterBody, setIsWaterBody] = useState(false);
   const [recentSnapshot, setRecentSnapshot] = useState(null);
+  const [tempThreshold, setTempThreshold] = useState(35);
 
   const [currentWeather, setCurrentWeather] = useState({
     temperature: null,
     maxTemp: null,
     humidity: null,
+    heatwaveStatus: "Low",
     windSpeed: null,
     soilMoisture: null,
     rainfallLastHour: null,
@@ -252,7 +254,7 @@ const Dashboard = () => {
   };
 
   const refreshAlerts = useCallback(
-    (weather, floodLabel, droughtLabel) => {
+    (weather, floodLabel, droughtLabel, heatwaveLabel, currentThreshold) => {
       const newAlerts = [];
 
       if (floodLabel?.toLowerCase?.() === "high") {
@@ -272,6 +274,22 @@ const Dashboard = () => {
         });
       }
 
+      if (heatwaveLabel?.toLowerCase?.() === "high") {
+        newAlerts.push({
+          type: "Heatwave",
+          message: `Active heatwave: Temperatures exceeding local 90th percentile (${currentThreshold || tempThreshold}°C) for 3+ consecutive days.`,
+          icon: <FaBolt className="text-danger" />,
+          timestamp: new Date().toISOString(),
+        });
+      } else if (heatwaveLabel?.toLowerCase?.() === "medium") {
+        newAlerts.push({
+          type: "Heatwave",
+          message: `Extreme heat event: Temperatures are currently exceeding the local 90th percentile (${currentThreshold || tempThreshold}°C).`,
+          icon: <FaBolt className="text-warning" />,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       if (weather?.rainfallLastHour > 15) {
         newAlerts.push({
           type: "Rain",
@@ -283,7 +301,7 @@ const Dashboard = () => {
 
       setAlerts(newAlerts);
     },
-    []
+    [tempThreshold]
   );
 
   // Handle manual coordinate submission with validation
@@ -297,17 +315,19 @@ const Dashboard = () => {
     }
     
     setValidationError(null);
+    setLoading(true);
     setCoords({ lat, lon });
   };
 
   const fetchAllData = useCallback(
     async (lat, lon) => {
       setLoading(true);
-      // Reset all states to clear previous location's data while loading
+      // Reset states to show "--" (wipe) during refresh
       setCurrentWeather({
         temperature: null,
         maxTemp: null,
         humidity: null,
+        heatwaveStatus: "Low",
         windSpeed: null,
         soilMoisture: null,
         rainfallLastHour: null,
@@ -320,26 +340,34 @@ const Dashboard = () => {
         floodProbability: 0,
         droughtProbability: 0,
       });
-      setRecentSnapshot(null);
-      setAlerts([]);
       setFloodRisk("--");
       setDroughtRisk("--");
       setFloodScore(0);
       setDroughtScore(0);
-      setIsWaterBody(false); 
+      setIsWaterBody(false);
+      setAlerts([]);
+      setRecentSnapshot(null);
       setLocationError(null);
       try {
-        // rainRes (precipitation endpoint) and weatherRes (weather endpoint) now return past+future data
-        const [weatherRes, predictionRes, geoRes] = await Promise.all([
+        // Use allSettled so one failed service doesn't crash the entire dashboard
+        const results = await Promise.allSettled([
           axios.get(`http://localhost:5000/api/weather?lat=${lat}&lon=${lon}`),
           axios.post(`http://localhost:5000/api/predict`, { latitude: lat, longitude: lon }),
           axios.get(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`, { 
             headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } 
-          }).catch(() => null)
+          }).catch(() => null),
+          axios.get(`http://localhost:5000/api/historical-analysis?lat=${lat}&lon=${lon}`)
         ]);
 
+        const weatherRes = results[0].status === 'fulfilled' ? results[0].value : null;
+        const predictionRes = results[1].status === 'fulfilled' ? results[1].value : null;
+        const geoRes = results[2].status === 'fulfilled' ? results[2].value : null;
+        const histRes = results[3].status === 'fulfilled' ? results[3].value : null;
+
+        if (!weatherRes || !predictionRes) throw new Error("Core climate services unavailable.");
+
         // --- Weather ---
-        const weatherSeries = weatherRes.data?.series || [];
+        const weatherSeries = weatherRes?.data?.series || [];
         
         // Find "Now" index to split into History (past 24h) and Future (next 24h)
         const nowISO = new Date().toISOString().slice(0, 13);
@@ -369,8 +397,31 @@ const Dashboard = () => {
         const lastHourRain = currentItem.precipitation ?? null;
         const totalRain24 = rainHist.length > 0 ? rainHist.reduce((a, b) => a + b, 0) : null;
         const avgTemp = computeAverage(tempHist);
-        // Calculate the maximum temperature reached in the last 24 hours for accurate heatwave monitoring
         const maxTemp24h = tempHist.length > 0 ? Math.max(...tempHist) : (currentItem.temperature ?? null);
+
+        // --- Localized Heatwave Logic (Yesterday, Today, Tomorrow) ---
+        // If the API limit is hit, we keep the existing threshold instead of reverting to 35
+        let threshold = tempThreshold;
+        if (histRes?.status === 'fulfilled' && histRes.value.data?.insights?.tempThreshold) {
+          threshold = histRes.value.data.insights.tempThreshold;
+          setTempThreshold(threshold);
+        }
+
+        // Use fixed 24-hour windows (Yesterday, Today, Tomorrow) to prevent sliding overlaps
+        const yesterdaySlice = weatherSeries.slice(0, 24);
+        const todaySlice = weatherSeries.slice(24, 48);
+        const tomorrowSlice = weatherSeries.slice(48, 72);
+
+        const yesterdayMax = yesterdaySlice.length > 0 ? Math.max(...yesterdaySlice.map(s => s.temperature || 0)) : 0;
+        const todayMax = todaySlice.length > 0 ? Math.max(...todaySlice.map(s => s.temperature || 0)) : 0;
+        const tomorrowMax = tomorrowSlice.length > 0 ? Math.max(...tomorrowSlice.map(s => s.temperature || 0)) : 0;
+
+        let heatStatus = "Low";
+        if (yesterdayMax >= threshold && todayMax >= threshold && tomorrowMax >= threshold && threshold > 0) {
+          heatStatus = "High"; // Sustained Heatwave
+        } else if (todayMax >= threshold) {
+          heatStatus = "Medium"; // Extreme Heat Event
+        }
 
         const nextWeatherSummary = {
           temperature: avgTemp,
@@ -381,6 +432,7 @@ const Dashboard = () => {
           rainfallLastHour: lastHourRain,
           rainfall24h: totalRain24,
           cloudCover: currentItem.cloudCover ?? null,
+          heatwaveStatus: heatStatus
         };
 
         setCurrentWeather(nextWeatherSummary);
@@ -801,9 +853,9 @@ const Dashboard = () => {
                 ? "--" 
                 : (isWaterBody || currentWeather.maxTemp === null 
                     ? "N/A" 
-                    : (currentWeather.maxTemp > 38 ? "High" : currentWeather.maxTemp > 32 ? "Medium" : "Low"))
+                    : currentWeather.heatwaveStatus)
             }
-            icon={<FaTemperatureHigh size={22} className="text-danger" />}
+            icon={<FaBolt size={22} className="text-danger" />}
           />
         </div>
 
@@ -929,9 +981,11 @@ const Dashboard = () => {
                 </li>
                 <li className="mb-2">
                   <strong className="text-secondary">Temperature anomaly:</strong> Peak 24h temperature of {formatDegrees(currentWeather.maxTemp)} suggests {
-                    currentWeather.maxTemp === null 
-                      ? "--" 
-                      : (currentWeather.maxTemp > 35 ? "heightened thermal stress" : "stable thermal conditions")
+                    currentWeather.heatwaveStatus === "High" 
+                      ? `an active heatwave (local threshold: ${tempThreshold}°C)` 
+                      : (currentWeather.heatwaveStatus === "Medium" 
+                          ? `heightened thermal stress (local threshold: ${tempThreshold}°C)` 
+                          : "stable thermal conditions")
                   }.
                 </li>
                 <li className="mb-2">
