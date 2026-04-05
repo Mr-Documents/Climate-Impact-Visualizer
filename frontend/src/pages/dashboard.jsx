@@ -50,16 +50,19 @@ const humanizeRisk = (label) => {
 };
 
 const getRiskColor = (risk) => {
-  switch (risk.toString().toLowerCase()) {
-    case "high":
-      return "#dc3545"; // red
-    case "medium":
-      return "#ffc107"; // yellow
-    case "low":
-      return "#28a745"; // green
-    default:
-      return "#6c757d"; // gray
+  const r = risk.toString().toLowerCase();
+  const val = parseFloat(r);
+
+  if (!isNaN(val)) {
+    if (val >= 70) return "#dc3545";
+    if (val >= 30) return "#ffc107";
+    return "#28a745";
   }
+
+  if (r === "high") return "#dc3545";
+  if (r === "medium") return "#ffc107";
+  if (r === "low") return "#28a745";
+  return "#6c757d";
 };
 
 const formatDegrees = (value) => (value == null || Number.isNaN(value) ? "--" : `${value.toFixed(1)}°C`);
@@ -73,7 +76,18 @@ const computeAverage = (arr) => {
   return filtered.reduce((sum, v) => sum + v, 0) / filtered.length;
 };
 
-function RiskGauge({ label, icon, title }) {
+// Helper to calculate heat stress based on temperature relative to a threshold
+const calculateHeatStress = (temp, threshold) => {
+  if (threshold <= 0) return 0.05;
+  // Use a wider window for smoother probability distribution
+  const lowerBound = threshold - 6;
+  const upperBound = threshold + 4;
+  if (temp <= lowerBound) return 0.02; // Baseline risk
+  if (temp >= upperBound) return 0.98; // Near-certainty
+  return 0.02 + ((temp - lowerBound) / (upperBound - lowerBound)) * 0.96;
+};
+
+function RiskGauge({ label, icon, title, subLabel = null }) {
   const color = getRiskColor(label);
 
   return (
@@ -85,6 +99,7 @@ function RiskGauge({ label, icon, title }) {
       <div className="fs-4 fw-bold" style={{ color }}>
         {humanizeRisk(label)}
       </div>
+      {subLabel && <div className="small text-muted mt-1">{subLabel}</div>}
     </div>
   );
 }
@@ -141,6 +156,7 @@ const Dashboard = () => {
     temperature: null,
     maxTemp: null,
     humidity: null,
+    heatwavePotential: null,
     heatwaveStatus: "Low",
     windSpeed: null,
     soilMoisture: null,
@@ -417,23 +433,39 @@ const Dashboard = () => {
         const todayMax = todaySlice.length > 0 ? Math.max(...todaySlice.map(s => s.temperature || 0)) : 0;
         const tomorrowMax = tomorrowSlice.length > 0 ? Math.max(...tomorrowSlice.map(s => s.temperature || 0)) : 0;
 
-        let heatStatus = "Low";
-        if (yesterdayMax >= threshold && todayMax >= threshold && tomorrowMax >= threshold && threshold > 0) {
-          heatStatus = "High"; // Sustained Heatwave
-        } else if (todayMax >= threshold) {
-          heatStatus = "Medium"; // Extreme Heat Event
+        // Calculate granular heat potential
+        const stressToday = calculateHeatStress(todayMax, threshold);
+        const stressYesterday = calculateHeatStress(yesterdayMax, threshold);
+        const stressTomorrow = calculateHeatStress(tomorrowMax, threshold);
+
+        // Weighted potential + Humidity bias for "Heat Index" accuracy
+        let heatPotential = (stressToday * 0.55 + stressYesterday * 0.2 + stressTomorrow * 0.25) * 100;
+        const humidityBias = (currentItem.humidity ?? 50) / 20; // Up to 5% impact based on humidity
+        heatPotential += humidityBias;
+
+        heatPotential = Math.min(99.2, Math.max(0.8, heatPotential)); // Never 0% or 100%
+
+        let heatStatus;
+        if (heatPotential >= 70) {
+          heatStatus = "High";
+        } else if (heatPotential >= 30) {
+          heatStatus = "Medium";
+        } else {
+          heatStatus = "Low";
         }
 
         const nextWeatherSummary = {
           temperature: avgTemp,
           maxTemp: maxTemp24h,
+          // Ensure heatwaveStatus is set based on the new heatPotential
+          heatwaveStatus: heatStatus,
+          heatwavePotential: heatPotential,
           humidity: currentItem.humidity ?? null,
           windSpeed: currentItem.windSpeed ?? null,
           soilMoisture: currentItem.soilMoisture ?? null,
           rainfallLastHour: lastHourRain,
           rainfall24h: totalRain24,
           cloudCover: currentItem.cloudCover ?? null,
-          heatwaveStatus: heatStatus
         };
 
         setCurrentWeather(nextWeatherSummary);
@@ -488,7 +520,7 @@ const Dashboard = () => {
           droughtProbability: droughtSc,
         });
 
-        refreshAlerts(nextWeatherSummary, floodLabel, droughtLabel);
+        refreshAlerts(nextWeatherSummary, floodLabel, droughtLabel, heatStatus, threshold);
       } catch (error) {
         console.error("Dashboard fetch error:", error);
         setFloodRisk("N/A");
@@ -506,6 +538,27 @@ const Dashboard = () => {
   useEffect(() => {
     fetchAllData(coords.lat, coords.lon);
   }, [coords.lat, coords.lon, fetchAllData]);
+
+  // Calculate dynamic temperature pattern for 30-day snapshot
+  const tempPattern = useMemo(() => {
+    if (!recentSnapshot?.temperature_2m_mean || recentSnapshot.temperature_2m_mean.length === 0) {
+      return { label: "N/A", color: "secondary" };
+    }
+    const temps = recentSnapshot.temperature_2m_mean.filter(t => typeof t === 'number' && !isNaN(t));
+    if (temps.length === 0) return { label: "N/A", color: "secondary" };
+
+    const maxTemp = Math.max(...temps);
+    const minTemp = Math.min(...temps);
+    const range = maxTemp - minTemp;
+
+    if (range > 10) {
+      return { label: "High Variation", color: "danger" };
+    } else if (range > 5) {
+      return { label: "Moderate Variation", color: "warning" };
+    } else {
+      return { label: "Low Variation", color: "success" };
+    }
+  }, [recentSnapshot]);
 
   const kpiCards = [
     {
@@ -778,7 +831,7 @@ const Dashboard = () => {
               </div>
               <div className="d-flex justify-content-between small">
                 <span>Temperature Pattern</span>
-                <span className="text-success fw-bold">Moderate Variation</span>
+                <span className={`text-${tempPattern.color} fw-bold`}>{tempPattern.label}</span>
               </div>
             </div>
           </div>
@@ -849,12 +902,15 @@ const Dashboard = () => {
           />
           <RiskGauge
             title="Heatwave Potential"
-            label={
-              loading 
-                ? "--" 
-                : (isWaterBody || currentWeather.maxTemp === null 
-                    ? "N/A" 
+            label={ // Display High/Medium/Low
+              loading
+                ? "--"
+                : (isWaterBody || currentWeather.maxTemp === null
+                    ? "N/A"
                     : currentWeather.heatwaveStatus)
+            }
+            subLabel={ // Display granular percentage
+              loading || isWaterBody || currentWeather.heatwavePotential === null ? null : `${currentWeather.heatwavePotential.toFixed(1)}% chance`
             }
             icon={<FaBolt size={22} className="text-danger" />}
           />

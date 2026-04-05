@@ -250,12 +250,12 @@ const MapPage = () => {
       stats[month].count++;
     });
 
-    const rainAverages = stats.map(s => (s.rain / estimatedYears).toFixed(1));
-    const peakMonthIdx = rainAverages.indexOf(Math.max(...rainAverages.map(Number)));
+    const rainAverages = stats.map(s => Number((s.rain / estimatedYears).toFixed(1)));
+    const peakMonthIdx = rainAverages.indexOf(Math.max(...rainAverages));
 
     return {
       labels: months,
-      temp: stats.map(s => (s.count > 0 ? (s.temp / s.count).toFixed(1) : 0)),
+      temp: stats.map(s => (s.count > 0 ? Number((s.temp / s.count).toFixed(1)) : 0)),
       rain: rainAverages,
       peakMonth: months[peakMonthIdx]
     };
@@ -328,7 +328,7 @@ const MapPage = () => {
   // Mock Sea Level Trend (Global Average ~3.3mm/year) for context
   const calculateSeaLevel = (year) => {
     const baseYear = 1993;
-    return Math.max(0, (year - baseYear) * 3.3).toFixed(1);
+    return Number(Math.max(0, (year - baseYear) * 3.3).toFixed(1));
   };
 
   const extremeEvents = React.useMemo(() => {
@@ -382,9 +382,9 @@ const MapPage = () => {
     const sortedYears = Object.keys(years).sort();
     return {
       labels: sortedYears,
-      temp: sortedYears.map(y => (years[y].tempSum / years[y].count).toFixed(1)),
-      rain: sortedYears.map(y => years[y].rainSum.toFixed(1)),
-      solar: sortedYears.map(y => (years[y].solarSum / years[y].count).toFixed(1)),
+      temp: sortedYears.map(y => Number((years[y].tempSum / years[y].count).toFixed(1))),
+      rain: sortedYears.map(y => Number(years[y].rainSum.toFixed(1))),
+      solar: sortedYears.map(y => Number((years[y].solarSum / years[y].count).toFixed(1))),
     };
   }, [historicalAnalysis]);
 
@@ -451,6 +451,11 @@ const MapPage = () => {
           {locationError && (
             <div className="alert alert-warning mt-3 mb-0 small d-flex align-items-center gap-2">
               <FaExclamationTriangle /> {locationError}
+            </div>
+          )}
+          {data.weather?.isWater && !locationError && (
+            <div className="alert alert-warning mt-3 mb-0 small d-flex align-items-center gap-2">
+              <FaExclamationTriangle /> Selected location is a water body. Terrestrial soil and UV metrics may be restricted.
             </div>
           )}
         </div>
@@ -703,9 +708,9 @@ const MapPage = () => {
                             </h6>
                             <p className="small mb-3">
                               Extreme events are defined by the local 30-year climate record (99th percentile). 
-                              <br/><strong>Peak Heat</strong>: Top 1% of daily maximums (>{heatThresholds.max.toFixed(1)}°C). 
-                              <br/><strong>Mean Heat</strong>: Top 1% of daily averages (>{heatThresholds.mean.toFixed(1)}°C).
-                              <br/><strong>Heavy Rain</strong>: Top 5% of wet days (>{historicalAnalysis.insights?.extremeRainThreshold || 50}mm).
+                              <br/><strong>Peak Heat</strong>: Top 1% of daily maximums (&gt;{heatThresholds.max.toFixed(1)}°C). 
+                              <br/><strong>Mean Heat</strong>: Top 1% of daily averages (&gt;{heatThresholds.mean.toFixed(1)}°C).
+                              <br/><strong>Heavy Rain</strong>: Top 5% of wet days (&gt;{historicalAnalysis.insights?.extremeRainThreshold || 50}mm).
                             </p>
                             <hr />
                             <div className="d-flex flex-column gap-2">
@@ -801,16 +806,19 @@ const MapPage = () => {
                     </h6>
                     <div style={{ height: '300px' }}>
                       <Bar 
-                        data={{
-                          labels: historicalAnalysis.insights.droughtSeries?.map(d => d.year),
-                          datasets: [{
-                            label: 'Standardized Precipitation Index (SPI)',
-                            data: historicalAnalysis.insights.droughtSeries?.map(d => d.spi),
-                            backgroundColor: historicalAnalysis.insights.droughtSeries?.map(d => d.spi < 0 ? 'rgba(220, 53, 69, 0.7)' : 'rgba(13, 110, 253, 0.7)'),
-                            borderColor: historicalAnalysis.insights.droughtSeries?.map(d => d.spi < 0 ? '#dc3545' : '#0d6efd'),
-                            borderWidth: 1
-                          }]
-                        }}
+                        data={(() => {
+                          const series = historicalAnalysis.insights?.droughtSeries || [];
+                          return {
+                            labels: series.map(d => d.year),
+                            datasets: [{
+                              label: 'Standardized Precipitation Index (SPI)',
+                              data: series.map(d => d.spi),
+                              backgroundColor: series.map(d => d.spi < 0 ? 'rgba(220, 53, 69, 0.7)' : 'rgba(13, 110, 253, 0.7)'),
+                              borderColor: series.map(d => d.spi < 0 ? '#dc3545' : '#0d6efd'),
+                              borderWidth: 1
+                            }]
+                          };
+                        })()}
                         options={{
                           responsive: true,
                           maintainAspectRatio: false,
@@ -851,16 +859,19 @@ const MapPage = () => {
                           <FaChartArea className="text-warning"/> 5. Correlation: Temp vs Rainfall
                         </h6>
                         <Scatter 
-                          data={{
-                            datasets: [{
-                              label: 'Climate Correlation',
-                              data: historicalAnalysis.raw.temperature_2m_mean?.filter((_, i) => i % 30 === 0).map((temp, i) => ({
-                                x: temp,
-                                y: historicalAnalysis.raw.precipitation_sum?.filter((_, j) => j % 30 === 0)[i] || 0
-                              })),
-                              backgroundColor: 'rgba(102, 16, 242, 0.6)'
-                            }]
-                          }}
+                          data={(() => {
+                            const sampledTemp = historicalAnalysis.raw.temperature_2m_mean?.filter((_, i) => i % 30 === 0) || [];
+                            const sampledRain = historicalAnalysis.raw.precipitation_sum?.filter((_, i) => i % 30 === 0) || [];
+                            return {
+                              datasets: [{
+                                label: 'Climate Correlation',
+                                data: sampledTemp.map((temp, i) => ({
+                                  x: temp, y: sampledRain[i] || 0
+                                })),
+                                backgroundColor: 'rgba(102, 16, 242, 0.6)'
+                              }]
+                            };
+                          })()}
                           options={{
                             scales: {
                               x: { title: { display: true, text: 'Mean Temperature (°C)' } },
