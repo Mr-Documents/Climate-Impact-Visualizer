@@ -184,8 +184,8 @@ export async function getHistoricalAnalysis(req, res) {
     const end_date = date.toISOString().split('T')[0];
     const start_date = `${start_year}-01-01`;
 
-    // Added shortwave_radiation_sum for solar radiation analysis
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start_date}&end_date=${end_date}&daily=temperature_2m_mean,precipitation_sum,shortwave_radiation_sum&timezone=auto`;
+    // Added temperature_2m_max for robust heatwave percentile thresholding
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start_date}&end_date=${end_date}&daily=temperature_2m_mean,temperature_2m_max,precipitation_sum,shortwave_radiation_sum&timezone=auto`;
     
     const response = await fetch(url);
     const data = await response.json();
@@ -210,15 +210,16 @@ export async function getHistoricalAnalysis(req, res) {
     const tempsRaw = data.daily.temperature_2m_mean || [];
     const n = data.daily.time.length;
     const validTemps = tempsRaw.filter(t => t !== null && t > -50 && t < 60);
-    const tempSorted = [...validTemps].sort((a, b) => a - b);
     
-    if (tempSorted.length < 2 || n < 2) {
+    if (validTemps.length < 2 || n < 2) {
       return res.status(404).json({ error: "No data points found for this range." });
     }
 
-    // Calculate 90th percentile for local heatwave thresholding
-    // Sanity check: Ensure threshold isn't lower than a baseline global average of 25°C to avoid "always high" alerts
-    const tempThreshold = tempSorted.length > 0 ? Math.max(25, tempSorted[Math.floor(tempSorted.length * 0.90)]) : 35;
+    // Calculate 99th percentile of Maximum Temperatures (Relative Threshold)
+    const maxTempsRaw = data.daily.temperature_2m_max || [];
+    const validMaxTemps = maxTempsRaw.filter(t => t !== null);
+    const maxSorted = [...validMaxTemps].sort((a, b) => a - b);
+    const tempThreshold = maxSorted.length > 0 ? Math.max(33, maxSorted[Math.floor(maxSorted.length * 0.99)]) : 35;
     
     // Linear Regression for Trend (Using index 0...n-1 as X)
     let xSum = 0, ySum = 0, xySum = 0, xSqSum = 0;
@@ -286,6 +287,7 @@ export async function getHistoricalAnalysis(req, res) {
         tempTrend: (slope * n).toFixed(2),
         isWarming: (slope * n) > 0,
         tempThreshold: Number(tempThreshold.toFixed(1)),
+        extremeRainThreshold: Number(p95Threshold.toFixed(1)),
         avgPrecip: avgAnnualRain.toFixed(2),
         rainAnomaly: rainAnomaly,
         droughtSeries: droughtIndexSeries,

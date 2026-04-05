@@ -240,17 +240,43 @@ const MapPage = () => {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const stats = Array(12).fill(0).map(() => ({ temp: 0, rain: 0, count: 0 }));
     
+    const totalDays = historicalAnalysis.raw.time.length;
+    const estimatedYears = totalDays / 365.25;
+
     historicalAnalysis.raw.time.forEach((t, i) => {
-      const month = new Date(t).getMonth();
+      const month = new Date(t).getUTCMonth();
       stats[month].temp += (historicalAnalysis.raw.temperature_2m_mean?.[i] || 0);
       stats[month].rain += (historicalAnalysis.raw.precipitation_sum?.[i] || 0);
       stats[month].count++;
     });
 
+    const rainAverages = stats.map(s => (s.rain / estimatedYears).toFixed(1));
+    const peakMonthIdx = rainAverages.indexOf(Math.max(...rainAverages.map(Number)));
+
     return {
       labels: months,
       temp: stats.map(s => (s.count > 0 ? (s.temp / s.count).toFixed(1) : 0)),
-      rain: stats.map(s => (s.count > 0 ? (s.rain / s.count).toFixed(1) : 0))
+      rain: rainAverages,
+      peakMonth: months[peakMonthIdx]
+    };
+  }, [historicalAnalysis]);
+
+  // Calculate the local 99th percentile thresholds (Relative Thresholds)
+  // This ensures that "Extreme Heat" is defined relative to both daily peaks and daily averages.
+  const heatThresholds = React.useMemo(() => {
+    const raw = historicalAnalysis?.raw || {};
+    const maxTemps = raw.temperature_2m_max || [];
+    const meanTemps = raw.temperature_2m_mean || [];
+    
+    const getThreshold = (temps, floor) => {
+      if (temps.length === 0) return floor;
+      const sorted = [...temps].sort((a, b) => a - b);
+      return Math.max(floor, sorted[Math.floor(sorted.length * 0.99)]);
+    };
+
+    return {
+      max: getThreshold(maxTemps, 33),
+      mean: getThreshold(meanTemps, 28)
     };
   }, [historicalAnalysis]);
 
@@ -258,39 +284,46 @@ const MapPage = () => {
   const extremeTrendData = React.useMemo(() => {
     if (!historicalAnalysis?.raw?.time) return null;
     const yearlyStats = {};
-    const temps = historicalAnalysis.raw.temperature_2m_mean || [];
-    const threshold = historicalAnalysis.insights?.tempThreshold || 35;
+    const rawData = historicalAnalysis.raw;
+    const maxTemps = rawData.temperature_2m_max || [];
+    const meanTemps = rawData.temperature_2m_mean || [];
+    const len = rawData.time.length;
+    const rainThreshold = historicalAnalysis.insights?.extremeRainThreshold || 50;
     
-    // Detect Heatwave Sequences (3+ consecutive days above local 90th percentile)
-    const isHeatwaveDay = new Array(temps.length).fill(false);
-    let currentStreak = [];
-
-    for (let i = 0; i < temps.length; i++) {
-      if (temps[i] >= threshold) {
-        currentStreak.push(i);
-      } else {
-        if (currentStreak.length >= 3) currentStreak.forEach(idx => isHeatwaveDay[idx] = true);
-        currentStreak = [];
+    const detectHeatwaves = (tempSeries, threshold) => {
+      const flags = new Array(len).fill(false);
+      let streak = [];
+      for (let i = 0; i < len; i++) {
+        if (tempSeries[i] >= threshold) streak.push(i);
+        else {
+          if (streak.length >= 3) streak.forEach(idx => flags[idx] = true);
+          streak = [];
+        }
       }
-    }
-    if (currentStreak.length >= 3) currentStreak.forEach(idx => isHeatwaveDay[idx] = true);
+      if (streak.length >= 3) streak.forEach(idx => flags[idx] = true);
+      return flags;
+    };
+
+    const isHeatwaveMax = detectHeatwaves(maxTemps, heatThresholds.max);
+    const isHeatwaveMean = detectHeatwaves(meanTemps, heatThresholds.mean);
     
-    historicalAnalysis.raw.time.forEach((t, i) => {
+    rawData.time.forEach((t, i) => {
       const year = t.split('-')[0];
-      if (!yearlyStats[year]) yearlyStats[year] = { heat: 0, rain: 0 };
+      if (!yearlyStats[year]) yearlyStats[year] = { heatMax: 0, heatMean: 0, rain: 0 };
       
-      // Heat count is now based on localized heatwave sequences
-      if (isHeatwaveDay[i]) yearlyStats[year].heat++;
-      if (historicalAnalysis.raw.precipitation_sum?.[i] > 50) yearlyStats[year].rain++;
+      if (isHeatwaveMax[i]) yearlyStats[year].heatMax++;
+      if (isHeatwaveMean[i]) yearlyStats[year].heatMean++;
+      if (rawData.precipitation_sum?.[i] > rainThreshold) yearlyStats[year].rain++;
     });
 
     const labels = Object.keys(yearlyStats).sort();
     return {
       labels,
-      heatEvents: labels.map(y => yearlyStats[y].heat),
+      heatEventsMax: labels.map(y => yearlyStats[y].heatMax),
+      heatEventsMean: labels.map(y => yearlyStats[y].heatMean),
       rainEvents: labels.map(y => yearlyStats[y].rain)
     };
-  }, [historicalAnalysis]);
+  }, [historicalAnalysis, heatThresholds]);
 
   // Mock Sea Level Trend (Global Average ~3.3mm/year) for context
   const calculateSeaLevel = (year) => {
@@ -301,30 +334,39 @@ const MapPage = () => {
   const extremeEvents = React.useMemo(() => {
     if (!historicalAnalysis?.raw?.time) return [];
     
-    const temps = historicalAnalysis.raw.temperature_2m_mean || [];
-    const threshold = historicalAnalysis.insights?.tempThreshold || 35;
-    const isHeatwaveDay = new Array(temps.length).fill(false);
-    let currentStreak = [];
+    const rawData = historicalAnalysis.raw;
+    const maxTemps = rawData.temperature_2m_max || [];
+    const meanTemps = rawData.temperature_2m_mean || [];
+    const len = rawData.time.length;
 
-    for (let i = 0; i < temps.length; i++) {
-      if (temps[i] >= threshold) {
-        currentStreak.push(i);
-      } else {
-        if (currentStreak.length >= 3) currentStreak.forEach(idx => isHeatwaveDay[idx] = true);
-        currentStreak = [];
+    const detectHeatwaves = (tempSeries, threshold) => {
+      const flags = new Array(len).fill(false);
+      let streak = [];
+      for (let i = 0; i < len; i++) {
+        if (tempSeries[i] >= threshold) streak.push(i);
+        else {
+          if (streak.length >= 3) streak.forEach(idx => flags[idx] = true);
+          streak = [];
+        }
       }
-    }
-    if (currentStreak.length >= 3) currentStreak.forEach(idx => isHeatwaveDay[idx] = true);
+      if (streak.length >= 3) streak.forEach(idx => flags[idx] = true);
+      return flags;
+    };
+
+    const isHeatwaveMax = detectHeatwaves(maxTemps, heatThresholds.max);
+    const isHeatwaveMean = detectHeatwaves(meanTemps, heatThresholds.mean);
 
     return historicalAnalysis.raw.time
       .map((t, i) => ({ 
         time: t, 
         rain: historicalAnalysis.raw.precipitation_sum?.[i] || 0, 
-        temp: historicalAnalysis.raw.temperature_2m_mean?.[i] || 0,
-        isHeatwave: isHeatwaveDay[i]
+        tempMax: rawData.temperature_2m_max?.[i] || 0,
+        tempMean: rawData.temperature_2m_mean?.[i] || 0,
+        isMaxHeat: isHeatwaveMax[i],
+        isMeanHeat: isHeatwaveMean[i]
       }))
-      .filter(d => d.rain > 50 || d.isHeatwave);
-  }, [historicalAnalysis]);
+      .filter(d => d.rain > 50 || d.isMaxHeat || d.isMeanHeat);
+  }, [historicalAnalysis, heatThresholds]);
 
   const yearlyTrends = React.useMemo(() => {
     if (!historicalAnalysis?.raw?.time) return null;
@@ -629,12 +671,17 @@ const MapPage = () => {
                                   labels: extremeTrendData.labels,
                                   datasets: [
                                     { 
-                              label: `Heatwave Days (>${historicalAnalysis.insights?.tempThreshold}°C)`, 
-                                      data: extremeTrendData.heatEvents, 
+                                      label: `Peak Heat Days (>${heatThresholds.max.toFixed(1)}°C)`, 
+                                      data: extremeTrendData.heatEventsMax, 
                                       backgroundColor: "rgba(220, 53, 69, 0.7)" 
                                     },
                                     { 
-                                      label: "Heavy Rainfall (>50mm Days)", 
+                                      label: `Mean Heat Days (>${heatThresholds.mean.toFixed(1)}°C)`, 
+                                      data: extremeTrendData.heatEventsMean, 
+                                      backgroundColor: "rgba(255, 159, 64, 0.7)" 
+                                    },
+                                    { 
+                                      label: `Heavy Rainfall (>${historicalAnalysis.insights?.extremeRainThreshold || 50}mm Days)`, 
                                       data: extremeTrendData.rainEvents, 
                                       backgroundColor: "rgba(13, 110, 253, 0.7)" 
                                     }
@@ -655,13 +702,20 @@ const MapPage = () => {
                               <FaExclamationTriangle /> Disaster Risk Impact
                             </h6>
                             <p className="small mb-3">
-                              Heatwaves are now detected based on the local 90th percentile threshold ({historicalAnalysis.insights?.tempThreshold}°C) sustained for 3+ days. This ensures accuracy across different climate zones.
+                              Extreme events are defined by the local 30-year climate record (99th percentile). 
+                              <br/><strong>Peak Heat</strong>: Top 1% of daily maximums (>{heatThresholds.max.toFixed(1)}°C). 
+                              <br/><strong>Mean Heat</strong>: Top 1% of daily averages (>{heatThresholds.mean.toFixed(1)}°C).
+                              <br/><strong>Heavy Rain</strong>: Top 5% of wet days (>{historicalAnalysis.insights?.extremeRainThreshold || 50}mm).
                             </p>
                             <hr />
                             <div className="d-flex flex-column gap-2">
                               <div className="d-flex justify-content-between small">
-                                <span>Total Extreme Heat Days:</span>
-                                <span className="fw-bold">{extremeTrendData.heatEvents.reduce((a,b) => a+b, 0)}</span>
+                                <span>Extreme Peak Heat Days:</span>
+                                <span className="fw-bold">{extremeTrendData.heatEventsMax.reduce((a,b) => a+b, 0)}</span>
+                              </div>
+                              <div className="d-flex justify-content-between small">
+                                <span>Extreme Mean Heat Days:</span>
+                                <span className="fw-bold">{extremeTrendData.heatEventsMean.reduce((a,b) => a+b, 0)}</span>
                               </div>
                               <div className="d-flex justify-content-between small">
                                 <span>Total Heavy Rain Days:</span>
@@ -774,37 +828,19 @@ const MapPage = () => {
 
                   {seasonalData && <div className="bg-light p-4 rounded shadow-sm border text-center w-100">
                     <h6 className="fw-bold mb-4 d-flex align-items-center justify-content-center gap-2">
-                      <FaGlobe className="text-success"/> 4. Seasonal Patterns (Monthly Averages)
+                      <FaGlobe className="text-success"/> 4. Seasonal Climatology (30-Year Monthly Averages)
                     </h6>
                     <Bar 
                       data={{
                         labels: seasonalData.labels,
                         datasets: [
-                          { label: "Avg Rain (mm)", data: seasonalData.rain, backgroundColor: "#0d6efd" },
-                          { label: "Avg Temp (°C)", data: seasonalData.temp, type: 'line', borderColor: "#dc3545", tension: 0.4 }
+                          { label: "Avg Monthly Rain (mm)", data: seasonalData.rain, backgroundColor: "rgba(13, 110, 253, 0.7)", yAxisID: 'y' },
+                          { label: "Avg Temp (°C)", data: seasonalData.temp, type: 'line', borderColor: "#dc3545", tension: 0.4, yAxisID: 'y1' }
                         ]
                       }}
                     />
                     <div className="mt-3 p-2 bg-white border rounded small">
-                      <strong>Insight:</strong> The data confirms a distinct {seasonalData.rain[5] > seasonalData.rain[0] ? 'Summer' : 'Winter'} wet season for this coordinate.
-                    </div>
-                  </div>}
-
-                  {seasonalData && <div className="bg-light p-4 rounded shadow-sm border text-center w-100">
-                    <h6 className="fw-bold mb-4 d-flex align-items-center justify-content-center gap-2">
-                      <FaGlobe className="text-success"/> 4. Seasonal Patterns (Monthly Averages)
-                    </h6>
-                    <Bar 
-                      data={{
-                        labels: seasonalData.labels,
-                        datasets: [
-                          { label: "Avg Rain (mm)", data: seasonalData.rain, backgroundColor: "#0d6efd" },
-                          { label: "Avg Temp (°C)", data: seasonalData.temp, type: 'line', borderColor: "#dc3545", tension: 0.4 }
-                        ]
-                      }}
-                    />
-                    <div className="mt-3 p-2 bg-white border rounded small">
-                      <strong>Insight:</strong> The data confirms a distinct {seasonalData.rain[5] > seasonalData.rain[0] ? 'Summer' : 'Winter'} wet season for this coordinate.
+                      <strong>Climatology Insight:</strong> Historical records indicate that peak precipitation typically occurs in <strong>{seasonalData.peakMonth}</strong>. This pattern defines the local agricultural and hydrological cycles.
                     </div>
                   </div>}
 
@@ -864,11 +900,13 @@ const MapPage = () => {
                           {extremeEvents.map((e, i) => (
                             <tr key={i}>
                               <td>{e.time}</td>
-                              <td>{e.isHeatwave && e.rain > 50 ? 'Compound Event' : e.isHeatwave ? 'Heatwave' : 'Heavy Rainfall'}</td>
+                              <td>
+                                {e.isMaxHeat && e.isMeanHeat ? 'Extreme Heatwave' : e.isMaxHeat ? 'Peak Heat' : e.isMeanHeat ? 'Mean Heat Anomaly' : 'Heavy Rainfall'}
+                              </td>
                               <td><span className="badge bg-danger">Critical</span></td>
                               <td>
-                                {e.isHeatwave ? `${e.temp.toFixed(1)}°C` : ''}
-                                {e.isHeatwave && e.rain > 50 ? ' / ' : ''}
+                                {e.isMaxHeat ? `Max: ${e.tempMax.toFixed(1)}°C ` : ''}
+                                {e.isMeanHeat ? `Mean: ${e.tempMean.toFixed(1)}°C ` : ''}
                                 {e.rain > 50 ? `${e.rain.toFixed(1)}mm` : ''}
                               </td>
                             </tr>

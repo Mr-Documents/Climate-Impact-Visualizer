@@ -412,6 +412,7 @@ const Dashboard = () => {
         const todaySlice = weatherSeries.slice(24, 48);
         const tomorrowSlice = weatherSeries.slice(48, 72);
 
+        // Compare forecast peak temperatures against the localized 95th percentile threshold
         const yesterdayMax = yesterdaySlice.length > 0 ? Math.max(...yesterdaySlice.map(s => s.temperature || 0)) : 0;
         const todayMax = todaySlice.length > 0 ? Math.max(...todaySlice.map(s => s.temperature || 0)) : 0;
         const tomorrowMax = tomorrowSlice.length > 0 ? Math.max(...tomorrowSlice.map(s => s.temperature || 0)) : 0;
