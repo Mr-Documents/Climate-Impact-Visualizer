@@ -50,12 +50,17 @@ const humanizeRisk = (label) => {
 };
 
 const getRiskColor = (risk) => {
+  if (!risk || risk === "--" || risk === "N/A") return "#6c757d";
+  
   const r = risk.toString().toLowerCase();
   const val = parseFloat(r);
 
+  // Handle numeric percentages (like Heatwave Potential)
+  // Normalize 0-1 scores (AI) to 0-100 for threshold checking
   if (!isNaN(val)) {
-    if (val >= 70) return "#dc3545";
-    if (val >= 30) return "#ffc107";
+    const normalizedVal = val <= 1.0 ? val * 100 : val;
+    if (normalizedVal >= 70) return "#dc3545";
+    if (normalizedVal >= 30) return "#ffc107";
     return "#28a745";
   }
 
@@ -453,12 +458,12 @@ const Dashboard = () => {
         const humidityBias = (currentItem.humidity ?? 50) / 20; // Up to 5% impact based on humidity
         heatPotential += humidityBias;
 
-        heatPotential = Math.min(99.2, Math.max(0.8, heatPotential)); // Never 0% or 100%
+        heatPotential = Math.min(99.9, Math.max(0.1, heatPotential));
 
         let heatStatus;
-        if (heatPotential >= 70) {
+        if (heatPotential >= 70) { // High threshold
           heatStatus = "High";
-        } else if (heatPotential >= 30) {
+        } else if (heatPotential >= 30) { // Medium threshold
           heatStatus = "Medium";
         } else {
           heatStatus = "Low";
