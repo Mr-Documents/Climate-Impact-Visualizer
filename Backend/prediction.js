@@ -5,6 +5,8 @@ import fs from "fs";
 if (process.platform === 'win32') {
   const tfDllPath = path.join(process.cwd(), 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
   process.env.PATH = `${process.env.PATH};${tfDllPath}`;
+  // Use delimiter to ensure compatibility across different shell environments
+  process.env.PATH = `${process.env.PATH}${path.delimiter}${tfDllPath}`;
 }
 
 // Dynamic import to apply PATH change first
