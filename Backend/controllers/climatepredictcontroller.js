@@ -421,7 +421,7 @@ export async function getUVDryness(req, res) {
     if (!lat || !lon) return res.status(400).json({ error: 'Coordinates required' });
 
     // Using GMT to match frontend ISO time comparison and 2 days to handle date-line transitions
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=uv_index,vapour_pressure_deficit&current=uv_index,is_day&forecast_days=2&timezone=GMT`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=uv_index,vapour_pressure_deficit&forecast_days=2&timezone=GMT`;
     
     const response = await fetch(url);
     const data = await response.json();
