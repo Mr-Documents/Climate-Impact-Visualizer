@@ -58,9 +58,11 @@ export async function predictClimate(req, res) {
     // Open-Meteo returns data starting from 00:00 yesterday (due to past_days=1). 
     // We take the slice ending at the current hour.
     const nowISO = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH
+    if (len === 0) throw new Error("Meteorological data arrays are empty.");
+
     let currentIndex = hourly.time.findIndex(t => t.startsWith(nowISO));
     if (currentIndex === -1 || currentIndex < TIME_STEPS - 1) currentIndex = Math.min(len - 1, TIME_STEPS - 1);
-    currentIndex = Math.min(currentIndex, len - 1);
+    currentIndex = Math.max(0, Math.min(currentIndex, len - 1));
 
     // Prepare historical data for visualization (last 24h)
     const historyData = {
@@ -175,8 +177,8 @@ export async function predictClimate(req, res) {
         alertsToLog.push({ 
           location_id: locData.id, 
           alert_type: 'Heatwave', 
-          severity: 'Medium', 
-          message: `Heat advisory: Temperatures (${temperature}°C) are approaching or exceeding the local threshold.` 
+          severity: temperature >= 38 ? 'High' : 'Medium', 
+          message: `Heat advisory: Temperatures (${temperature.toFixed(1)}°C) are approaching or exceeding the local threshold.` 
         });
       }
 
@@ -194,9 +196,9 @@ export async function predictClimate(req, res) {
       weather: { 
         precipitation: precipitation, 
         soilMoisture: isWater ? null : soilMoisture, 
-        windSpeed: windSpeed, 
-        temperature: temperature, 
-        humidity: humidity 
+        windSpeed: Number(windSpeed.toFixed(1)), 
+        temperature: Number(temperature.toFixed(1)), 
+        humidity: Math.round(humidity) 
       },
       history: historyData,
       recentSnapshot: snapshotData.daily,
