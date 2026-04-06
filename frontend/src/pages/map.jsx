@@ -210,10 +210,13 @@ const MapPage = () => {
   // Helper: Find value corresponding to current hour in hourly arrays
   const getHourlyValue = (source, key) => {
     if (!source?.hourly?.[key] || !source?.hourly?.time) return null;
-    const nowISO = new Date().toISOString().split(':')[0]; // Gets YYYY-MM-DDTHH
+    // Open-Meteo returns UTC strings like "2024-01-01T12:00". Match the date + hour.
+    const nowISO = new Date().toISOString().slice(0, 13); // Gets YYYY-MM-DDTHH
     const idx = source.hourly.time.findIndex(t => t.startsWith(nowISO));
-    // Return current hour value, or null if not found (don't default to 0 index as it might be night/0)
-    return idx !== -1 ? source.hourly[key][idx] : null;
+    
+    // Return value at current hour, or fallback to first index if match fails
+    const val = idx !== -1 ? source.hourly[key][idx] : source.hourly[key][0];
+    return val !== undefined ? val : null;
   };
 
   // Extract current hour snapshots
@@ -225,8 +228,8 @@ const MapPage = () => {
     precipitation: data.weather?.series?.[0]?.precipitation ?? null,
     soil: data.weather?.series?.[0]?.soilMoisture ?? null,
     clouds: data.weather?.series?.[0]?.cloudCover ?? null,
-    uv: data.uvDryness?.current?.uv_index ?? getHourlyValue(data.uvDryness, 'uv_index') ?? null,
-    vpd: data.uvDryness?.current?.vapour_pressure_deficit ?? getHourlyValue(data.uvDryness, 'vapour_pressure_deficit') ?? null,
+    uv: data.uvDryness?.current?.uv_index ?? getHourlyValue(data.uvDryness, 'uv_index'),
+    vpd: data.uvDryness?.current?.vapour_pressure_deficit ?? getHourlyValue(data.uvDryness, 'vapour_pressure_deficit'),
     co: data.airQuality?.current?.carbon_monoxide ?? data.airQuality?.hourly?.carbon_monoxide?.[0] ?? null,
     pm25: data.airQuality?.current?.pm2_5 ?? data.airQuality?.hourly?.pm2_5?.[0] ?? null,
     no2: data.airQuality?.current?.nitrogen_dioxide ?? data.airQuality?.hourly?.nitrogen_dioxide?.[0] ?? null,
