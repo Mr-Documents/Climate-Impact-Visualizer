@@ -300,7 +300,7 @@ const Dashboard = () => {
       } else if (heatwaveLabel?.toLowerCase?.() === "medium") {
         newAlerts.push({
           type: "Heatwave",
-          message: `Extreme heat event: Temperatures are currently exceeding the local 90th percentile (${currentThreshold || tempThreshold}°C).`,
+          message: `Heat advisory: Temperatures are approaching or exceeding the local 90th percentile (${currentThreshold || tempThreshold}°C).`,
           icon: <FaBolt className="text-warning" />,
           timestamp: new Date().toISOString(),
         });
