@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
 import CoordinateForm from "../components/forms/coordinateform";
-import { FaRobot, FaLightbulb, FaMapMarkerAlt, FaBolt } from "react-icons/fa";
+import { FaRobot, FaLightbulb, FaMapMarkerAlt, FaBolt, FaHistory } from "react-icons/fa";
 import { Line } from "react-chartjs-2";
 import { Circle } from "react-leaflet";
 import {
@@ -150,6 +150,7 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isWaterBody, setIsWaterBody] = useState(false);
   const [recentSnapshot, setRecentSnapshot] = useState(null);
+  const [searchHistory, setSearchHistory] = useState([]);
   const [tempThreshold, setTempThreshold] = useState(35);
 
   const [currentWeather, setCurrentWeather] = useState({
@@ -196,6 +197,15 @@ const Dashboard = () => {
     const complexityFactor = (Math.max(floodScore, droughtScore) * 7.2) + (Math.abs(floodScore - droughtScore) * 4.8);
     return `${Math.min(99.9, baseConfidence + complexityFactor).toFixed(1)}%`;
   }, [isWaterBody, loading, floodScore, droughtScore]);
+
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/history");
+      setSearchHistory(res.data);
+    } catch (err) {
+      console.error("Failed to fetch search history:", err);
+    }
+  }, []);
 
   const dataSources = useMemo(
     () => [
@@ -532,12 +542,16 @@ const Dashboard = () => {
         setLoading(false);
       }
     },
-    [refreshAlerts]
+    [refreshAlerts, fetchHistory]
   );
 
   useEffect(() => {
     fetchAllData(coords.lat, coords.lon);
   }, [coords.lat, coords.lon, fetchAllData]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   // Calculate dynamic temperature pattern for 30-day snapshot
   const tempPattern = useMemo(() => {
@@ -816,22 +830,57 @@ const Dashboard = () => {
 
         {/* 7. Recent Climate Snapshot */}
         <div className="col-lg-4">
-          <div className="card shadow-sm border-0 h-100">
-            <div className="card-header bg-white fw-bold py-3">Recent 30-Day Snapshot</div>
-            <div className="card-body">
-              <div className="text-center mb-4">
-                <div className="display-6 fw-bold text-primary">
-                  {recentSnapshot ? (recentSnapshot.precipitation_sum?.reduce((a, b) => a + (b || 0), 0) || 0).toFixed(1) : (loading ? '--' : 'N/A')}mm
+          <div className="d-flex flex-column gap-4 h-100">
+            <div className="card shadow-sm border-0">
+              <div className="card-header bg-white fw-bold py-3">Recent 30-Day Snapshot</div>
+              <div className="card-body">
+                <div className="text-center mb-4">
+                  <div className="display-6 fw-bold text-primary">
+                    {recentSnapshot ? (recentSnapshot.precipitation_sum?.reduce((a, b) => a + (b || 0), 0) || 0).toFixed(1) : (loading ? '--' : 'N/A')}mm
+                  </div>
+                  <div className="text-muted small">Total Rainfall (Past 30 Days)</div>
                 </div>
-                <div className="text-muted small">Total Rainfall (Past 30 Days)</div>
+                <div className="d-flex justify-content-between small mb-2">
+                  <span>Rainfall Spikes</span>
+                  <span className="badge bg-info text-dark">Detected: {recentSnapshot?.precipitation_sum?.filter(r => r > 10).length || 0} days</span>
+                </div>
+                <div className="d-flex justify-content-between small">
+                  <span>Temperature Pattern</span>
+                  <span className={`text-${tempPattern.color} fw-bold`}>{tempPattern.label}</span>
+                </div>
               </div>
-              <div className="d-flex justify-content-between small mb-2">
-                <span>Rainfall Spikes</span>
-                <span className="badge bg-info text-dark">Detected: {recentSnapshot?.precipitation_sum?.filter(r => r > 10).length || 0} days</span>
+            </div>
+
+            <div className="card shadow-sm border-0 flex-grow-1">
+              <div className="card-header bg-white fw-bold py-3 d-flex align-items-center gap-2">
+                <FaHistory className="text-secondary" /> Recent Global Activity
               </div>
-              <div className="d-flex justify-content-between small">
-                <span>Temperature Pattern</span>
-                <span className={`text-${tempPattern.color} fw-bold`}>{tempPattern.label}</span>
+              <div className="card-body p-0 overflow-auto" style={{ maxHeight: "300px" }}>
+                {searchHistory.length === 0 ? (
+                  <div className="p-3 text-muted small">No recent activity found.</div>
+                ) : (
+                  <div className="list-group list-group-flush">
+                    {searchHistory.map((item, idx) => (
+                      <button
+                        key={idx}
+                        className="list-group-item list-group-item-action border-0 py-2 px-3"
+                        onClick={() => setCoords({ lat: item.locations.latitude, lon: item.locations.longitude })}
+                      >
+                        <div className="d-flex justify-content-between align-items-center">
+                          <div className="text-truncate small fw-bold" style={{ maxWidth: "160px" }}>
+                            {item.locations.name}
+                          </div>
+                          <span className="badge bg-light text-dark x-small">
+                            {item.temp_avg.toFixed(1)}°C
+                          </span>
+                        </div>
+                        <div className="x-small text-muted">
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

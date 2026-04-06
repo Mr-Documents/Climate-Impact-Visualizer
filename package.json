@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@supabase/supabase-js": "^2.78.0",
     "@tanstack/react-query": "^5.90.10",
     "@tensorflow/tfjs-node": "^4.22.0",
     "@testing-library/dom": "^10.4.1",

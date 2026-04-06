@@ -1,10 +1,7 @@
 // controllers/predictionClimate.js
 import fetch from 'node-fetch';
 import { predictClimateRisk } from '../prediction.js';
-
-// In-memory cache for historical analysis to prevent API rate limiting
-const historicalCache = new Map();
-const CACHE_LIMIT = 100; // Keep last 100 locations
+import { supabase } from '../routes/supabaseClient.js';
 
 /**
  * Handles /api/predict requests with live Open-Meteo weather data
@@ -62,8 +59,8 @@ export async function predictClimate(req, res) {
     // We take the slice ending at the current hour.
     const nowISO = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH
     let currentIndex = hourly.time.findIndex(t => t.startsWith(nowISO));
-    if (currentIndex === -1) currentIndex = len - 1; // Fallback to end
-    if (currentIndex < TIME_STEPS) currentIndex = TIME_STEPS; // Ensure we have enough history
+    if (currentIndex === -1 || currentIndex < TIME_STEPS - 1) currentIndex = Math.min(len - 1, TIME_STEPS - 1);
+    currentIndex = Math.min(currentIndex, len - 1);
 
     // Prepare historical data for visualization (last 24h)
     const historyData = {
@@ -135,6 +132,62 @@ export async function predictClimate(req, res) {
       prediction = await predictClimateRisk(featuresSequence);
     }
 
+    // --- Persist to Supabase ---
+    try {
+      // 1. Upsert Location
+      const { data: locData, error: locError } = await supabase
+        .from('locations')
+        .upsert({ latitude, longitude, name: locationName }, { onConflict: 'latitude,longitude' })
+        .select()
+        .single();
+
+      if (locError) {
+        throw new Error(`Location upsert failed: ${locError.message}`);
+      }
+
+      if (locData) {
+        // 2. Log Climate Data & Predictions to 'climate_logs'
+        await supabase.from('climate_logs').insert({
+          location_id: locData.id,
+          temp_avg: temperature,
+          humidity: humidity,
+          soil_moisture: isWater ? null : soilMoisture,
+          precipitation: precipitation,
+          flood_risk_label: prediction.flood.label,
+          flood_risk_score: prediction.flood.score,
+          drought_risk_label: prediction.drought.label,
+          drought_risk_score: prediction.drought.score,
+          // Note: heatwave_potential is calculated on frontend in current setup, 
+          // but we can log raw inputs or calculate here if needed.
+        });
+      }
+
+      // 3. Log active alerts to 'weather_alerts' table
+      const alertsToLog = [];
+      if (prediction.flood.label === "High") {
+        alertsToLog.push({ location_id: locData.id, alert_type: 'Flood', severity: 'High', message: 'Flood warning: heavy precipitation and saturated soils detected.' });
+      }
+      if (prediction.drought.label === "High") {
+        alertsToLog.push({ location_id: locData.id, alert_type: 'Drought', severity: 'High', message: 'Drought alert: soil moisture is low while temperatures are high.' });
+      }
+      // Basic backend heatwave check (matching front-end advisory logic)
+      if (temperature > 35) {
+        alertsToLog.push({ 
+          location_id: locData.id, 
+          alert_type: 'Heatwave', 
+          severity: 'Medium', 
+          message: `Heat advisory: Temperatures (${temperature}°C) are approaching or exceeding the local threshold.` 
+        });
+      }
+
+      if (alertsToLog.length > 0) {
+        await supabase.from('weather_alerts').insert(alertsToLog);
+      }
+    } catch (dbError) {
+      console.error('Supabase logging failed:', dbError.message);
+      // We don't block the response if DB logging fails
+    }
+
     res.json({
       location: { latitude, longitude },
       locationName,
@@ -158,6 +211,41 @@ export async function predictClimate(req, res) {
 }
 
 /**
+ * Fetches recent climate search history from Supabase
+ */
+export async function getSearchHistory(req, res) {
+  try {
+    const { data, error } = await supabase
+      .from('climate_logs')
+      .select('*, locations(name, latitude, longitude)')
+      .order('created_at', { ascending: false })
+      .limit(10); // Return last 10 searches
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch history', details: err.message });
+  }
+}
+
+/**
+ * Fetches all global alerts from Supabase
+ */
+export async function getGlobalAlerts(req, res) {
+  try {
+    const { data, error } = await supabase
+      .from('weather_alerts')
+      .select('*, locations(name)')
+      .order('timestamp', { ascending: false });
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch alerts', details: err.message });
+  }
+}
+
+/**
  * Deep Historical Analysis Engine (30+ Years)
  */
 export async function getHistoricalAnalysis(req, res) {
@@ -168,14 +256,23 @@ export async function getHistoricalAnalysis(req, res) {
       return res.status(400).json({ error: "Latitude and Longitude are required." });
     }
 
-    // 1. Define the cache key and check for existing data
-    const cacheKey = `${Number(lat).toFixed(2)}_${Number(lon).toFixed(2)}_${start_year}`;
-    const cachedEntry = historicalCache.get(cacheKey);
+    // 1. Check Supabase for existing cached data (within last 30 days)
+    const { data: cachedData } = await supabase
+      .from('historical_cache')
+      .select('analysis_data, created_at')
+      .eq('latitude', Number(lat).toFixed(2))
+      .eq('longitude', Number(lon).toFixed(2))
+      .eq('start_year', start_year)
+      .maybeSingle();
 
-    // Check if cache exists and is less than 24 hours old
-    if (cachedEntry && (Date.now() - cachedEntry.timestamp < 24 * 60 * 60 * 1000)) {
-      console.log(`[Cache Hit] Serving fresh historical data for ${cacheKey}`);
-      return res.json(cachedEntry.data);
+    if (cachedData) {
+      const cacheAge = Date.now() - new Date(cachedData.created_at).getTime();
+      const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+      
+      if (cacheAge < THIRTY_DAYS) {
+        console.log(`[Cache Hit] Serving persisted historical data for ${lat},${lon}`);
+        return res.json(cachedData.analysis_data);
+      }
     }
 
     // Open-Meteo Archive lag: Set end_date to 5 days ago to ensure data availability
@@ -297,12 +394,14 @@ export async function getHistoricalAnalysis(req, res) {
       }
     };
 
-    // Store in cache before returning
-    if (historicalCache.size >= CACHE_LIMIT) {
-      const firstKey = historicalCache.keys().next().value;
-      historicalCache.delete(firstKey);
-    }
-    historicalCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    // 2. Store in Supabase cache before returning
+    await supabase.from('historical_cache').upsert({
+      latitude: Number(lat).toFixed(2),
+      longitude: Number(lon).toFixed(2),
+      start_year: start_year,
+      analysis_data: result,
+      created_at: new Date().toISOString()
+    });
 
     res.json(result);
   } catch (err) {
