@@ -219,17 +219,25 @@ const MapPage = () => {
     return val !== undefined ? val : null;
   };
 
-  // Extract current hour snapshots
+  // Find the index of the current hour within the weather series
+  const currentHourIdx = React.useMemo(() => {
+    if (!data.weather?.series) return 0;
+    const nowISO = new Date().toISOString().slice(0, 13);
+    const idx = data.weather.series.findIndex(s => s.time.startsWith(nowISO));
+    return idx !== -1 ? idx : 0;
+  }, [data.weather]);
+
+  // Extract current hour snapshots using the aligned index
   const current = {
-    temp: data.weather?.series?.[0]?.temperature ?? null,
-    windSpeed: data.weather?.series?.[0]?.windSpeed ?? null,
-    windDirection: data.weather?.series?.[0]?.windDirection ?? null,
-    humidity: data.weather?.series?.[0]?.humidity ?? null,
-    precipitation: data.weather?.series?.[0]?.precipitation ?? null,
-    soil: data.weather?.series?.[0]?.soilMoisture ?? null,
-    clouds: data.weather?.series?.[0]?.cloudCover ?? null,
-    uv: data.uvDryness?.current?.uv_index ?? getHourlyValue(data.uvDryness, 'uv_index'),
-    vpd: data.uvDryness?.current?.vapour_pressure_deficit ?? getHourlyValue(data.uvDryness, 'vapour_pressure_deficit'),
+    temp: data.weather?.series?.[currentHourIdx]?.temperature ?? null,
+    windSpeed: data.weather?.series?.[currentHourIdx]?.windSpeed ?? null,
+    windDirection: data.weather?.series?.[currentHourIdx]?.windDirection ?? null,
+    humidity: data.weather?.series?.[currentHourIdx]?.humidity ?? null,
+    precipitation: data.weather?.series?.[currentHourIdx]?.precipitation ?? null,
+    soil: data.weather?.series?.[currentHourIdx]?.soilMoisture ?? null,
+    clouds: data.weather?.series?.[currentHourIdx]?.cloudCover ?? null,
+    uv: data.uvDryness?.uvIndex ?? data.weather?.series?.[currentHourIdx]?.uvIndex ?? 0,
+    vpd: data.uvDryness?.vpd ?? data.weather?.series?.[currentHourIdx]?.vpd ?? null,
     co: data.airQuality?.current?.carbon_monoxide ?? data.airQuality?.hourly?.carbon_monoxide?.[0] ?? null,
     pm25: data.airQuality?.current?.pm2_5 ?? data.airQuality?.hourly?.pm2_5?.[0] ?? null,
     no2: data.airQuality?.current?.nitrogen_dioxide ?? data.airQuality?.hourly?.nitrogen_dioxide?.[0] ?? null,
