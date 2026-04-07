@@ -207,18 +207,6 @@ const MapPage = () => {
     );
   };
 
-  // Helper: Find value corresponding to current hour in hourly arrays
-  const getHourlyValue = (source, key) => {
-    if (!source?.hourly?.[key] || !source?.hourly?.time) return null;
-    // Open-Meteo returns UTC strings like "2024-01-01T12:00". Match the date + hour.
-    const nowISO = new Date().toISOString().slice(0, 13); // Gets YYYY-MM-DDTHH
-    const idx = source.hourly.time.findIndex(t => t.startsWith(nowISO));
-    
-    // Return value at current hour, or fallback to first index if match fails
-    const val = idx !== -1 ? source.hourly[key][idx] : source.hourly[key][0];
-    return val !== undefined ? val : null;
-  };
-
   // Find the index of the current hour within the weather series
   const currentHourIdx = React.useMemo(() => {
     if (!data.weather?.series) return 0;
