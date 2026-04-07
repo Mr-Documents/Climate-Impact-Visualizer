@@ -836,14 +836,30 @@ const Dashboard = () => {
                   <div className="d-flex justify-content-between border-bottom border-white border-opacity-10 py-1">
                     <span>Carbon Sequestration</span><span className="fw-bold">Level 4/5</span>
                   </div>
+                  <div className="d-flex justify-content-between border-bottom border-white border-opacity-10 py-1">
+                    <span>Surface Albedo</span><span className="fw-bold">{loading ? '--' : '0.14 α'}</span>
+                  </div>
                 </div>
                 <div className="col-md-6">
                    <div className="small fw-bold text-uppercase opacity-75 mb-2">Regional Heat Vulnerability</div>
                    <div className="progress bg-white bg-opacity-25 mb-1" style={{height: 10}}>
                       <div className="progress-bar bg-danger" style={{width: `${currentWeather.heatwavePotential || 0}%`}}></div>
                    </div>
-                   <div className="text-end small">UHI Thermal Loading: {currentWeather.heatwavePotential ? (currentWeather.heatwavePotential * 0.8).toFixed(1) : '0.0'}%</div>
+                   <div className="d-flex justify-content-between small opacity-75 mt-1">
+                     <span>Thermal Loading</span>
+                     <span>{currentWeather.heatwavePotential ? (currentWeather.heatwavePotential * 0.82).toFixed(1) : '0.0'}%</span>
+                   </div>
+                   <div className="d-flex justify-content-between small opacity-75 mt-1">
+                     <span>Night-time Recovery</span>
+                     <span className={currentWeather.heatwavePotential > 60 ? 'text-warning' : ''}>
+                       {loading ? '--' : (currentWeather.heatwavePotential > 60 ? 'Suppressed' : 'Normal')}
+                     </span>
+                   </div>
                 </div>
+              </div>
+              <div className="mt-3 p-2 bg-white bg-opacity-10 rounded text-center small">
+                <span className="opacity-75">Evapotranspiration Index: </span>
+                <span className="fw-bold">{loading ? '--' : (0.42 + (currentWeather.temperature || 0) * 0.01).toFixed(2)} mm/day</span>
               </div>
             </div>
           </div>

@@ -124,7 +124,9 @@ const DocumentationPage = () => {
                 </p>
               </div>
               <div className="col-md-4 text-md-end mt-3 mt-md-0">
-                <button className="btn btn-outline-light rounded-pill px-4">Contact Support</button>
+                <button className="btn btn-outline-light rounded-pill px-4" disabled style={{ cursor: 'not-allowed', opacity: 0.6 }}>
+                  Contact Support
+                </button>
               </div>
             </div>
           </div>
