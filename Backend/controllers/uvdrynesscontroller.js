@@ -26,7 +26,7 @@ export const getUVDryness = async (req, res) => {
     const series = (hourly?.time || []).map((time, i) => ({
       time,
       uvIndex: hourly.uv_index?.[i] ?? null,
-      drynessIndex: hourly.vapour_pressure_deficit?.[i] ?? null,
+      vpd: hourly.vapour_pressure_deficit?.[i] ?? null,
     }));
 
     // Pass 'hourly' raw data so the frontend helper `getHourlyValue` can extract specific hour data

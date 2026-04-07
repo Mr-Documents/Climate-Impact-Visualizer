@@ -28,7 +28,7 @@ export async function predictClimate(req, res) {
     const snapshotData = await snapshotRes.json();
 
     // Fetch current weather from Open-Meteo
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,soil_moisture_0_1cm&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,soil_moisture_0_1cm&past_days=1&forecast_days=1`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,soil_moisture_0_1cm,uv_index&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,soil_moisture_0_1cm,uv_index,vapour_pressure_deficit&past_days=1&forecast_days=1`;
     const response = await fetch(url);
     const data = await response.json();
 
@@ -37,6 +37,11 @@ export async function predictClimate(req, res) {
     const precipitation = current.precipitation || 0;
     const windSpeed = current.wind_speed_10m || 0;
     const temperature = current.temperature_2m || 25;
+    const uvIndex = current.uv_index || 0;
+    
+    // Calculate current VPD manually as it's not available in the 'current' API response
+    const currentSvp = 0.6108 * Math.exp((17.27 * temperature) / (temperature + 237.3));
+    const vpdValue = currentSvp * (1 - ((current.relative_humidity_2m || 60) / 100));
     
     // Robust water detection: If soil moisture is entirely null or strictly zero across the series, treat as water/invalid.
     const hourlySoil = data.hourly?.soil_moisture_0_1cm || [];
@@ -198,7 +203,9 @@ export async function predictClimate(req, res) {
         soilMoisture: isWater ? null : soilMoisture, 
         windSpeed: Number(windSpeed.toFixed(1)), 
         temperature: Number(temperature.toFixed(1)), 
-        humidity: Math.round(humidity) 
+        humidity: Math.round(humidity),
+        uvIndex: Number(uvIndex.toFixed(1)),
+        vpd: Number(vpdValue.toFixed(2))
       },
       history: historyData,
       recentSnapshot: snapshotData.daily,
