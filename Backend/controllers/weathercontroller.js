@@ -27,15 +27,23 @@ export const getWeatherData = async (req, res) => {
     const series = (hourly?.time || []).map((time, i) => ({
       time,
       temperature: hourly.temperature_2m?.[i] ?? null,
-      humidity: hourly.relative_humidity_2m?.[i] ?? null,
+      humidity: hourly.relative_humidity_2m?.[i] ?? 60,
       precipitation: hourly.precipitation?.[i] ?? null,
       windSpeed: hourly.wind_speed_10m?.[i] ?? null,
       windDirection: hourly.wind_direction_10m?.[i] ?? null,
       cloudCover: hourly.cloudcover?.[i] ?? null,
       soilMoisture: isWater ? null : (hourly.soil_moisture_0_1cm?.[i] ?? null),
       soilTemperature: isWater ? null : (hourly.soil_temperature_0cm?.[i] ?? null),
-      uvIndex: hourly.uv_index?.[i] ?? null,
-      vpd: hourly.vapour_pressure_deficit?.[i] ?? null,
+      uvIndex: hourly.uv_index?.[i] ?? 0,
+      vpd: (() => {
+        const vpdRaw = hourly.vapour_pressure_deficit?.[i];
+        if (vpdRaw != null) return vpdRaw;
+        // Fallback calculation
+        const t = hourly.temperature_2m?.[i] ?? 25;
+        const rh = hourly.relative_humidity_2m?.[i] ?? 60;
+        const svp = 0.6108 * Math.exp((17.27 * t) / (t + 237.3));
+        return Number((svp * (1 - (rh / 100))).toFixed(2));
+      })(),
     }));
 
     res.json({ location: { lat: safeLat, lon: safeLon }, series, isWater });

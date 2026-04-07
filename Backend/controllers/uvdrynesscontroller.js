@@ -23,14 +23,34 @@ export const getUVDryness = async (req, res) => {
     const response = await axios.get(url);
     const { current, hourly } = response.data;
 
+    // Find index of current hour in the hourly array to provide "current" stats
+    const nowISO = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH
+    let currentIndex = (hourly?.time || []).findIndex(t => t.startsWith(nowISO));
+    if (currentIndex === -1) currentIndex = 0;
+
+    const currentUV = hourly.uv_index ? hourly.uv_index[currentIndex] : 0;
+    
+    // Manual VPD calculation as fallback for reliability
+    const temp = hourly.temperature_2m ? hourly.temperature_2m[currentIndex] : 25;
+    const hum = hourly.relative_humidity_2m ? hourly.relative_humidity_2m[currentIndex] : 60;
+    const svp = 0.6108 * Math.exp((17.27 * temp) / (temp + 237.3));
+    const manualVPD = svp * (1 - (hum / 100));
+    const currentVPD = hourly.vapour_pressure_deficit ? (hourly.vapour_pressure_deficit[currentIndex] ?? manualVPD) : manualVPD;
+
     const series = (hourly?.time || []).map((time, i) => ({
       time,
       uvIndex: hourly.uv_index?.[i] ?? null,
       vpd: hourly.vapour_pressure_deficit?.[i] ?? null,
     }));
 
-    // Pass 'hourly' raw data so the frontend helper `getHourlyValue` can extract specific hour data
-    res.json({ location: { lat: safeLat, lon: safeLon }, current, hourly, series });
+    res.json({ 
+      location: { lat: safeLat, lon: safeLon }, 
+      current: { ...current, uvIndex: currentUV, vpd: currentVPD },
+      uvIndex: currentUV, 
+      vpd: currentVPD,
+      hourly, 
+      series 
+    });
   } catch (error) {
     console.error('UV/Dryness fetch error:', error.message);
     res.status(500).json({ error: 'Failed to fetch UV/Dryness data' });
