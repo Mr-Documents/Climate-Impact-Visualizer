@@ -827,6 +827,24 @@ const Dashboard = () => {
                    </div>
                 </div>
               </div>
+              <div className="row g-3 mt-2 pt-3 border-top border-white border-opacity-10">
+                <div className="col-md-6">
+                  <div className="small fw-bold text-uppercase opacity-75 mb-2">Ecological Resilience</div>
+                  <div className="d-flex justify-content-between border-bottom border-white border-opacity-10 py-1">
+                    <span>Vegetation Health</span><span className="fw-bold">{loading ? '--' : (currentWeather.soilMoisture > 0.25 ? 'Optimal' : 'Stressed')}</span>
+                  </div>
+                  <div className="d-flex justify-content-between border-bottom border-white border-opacity-10 py-1">
+                    <span>Carbon Sequestration</span><span className="fw-bold">Level 4/5</span>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                   <div className="small fw-bold text-uppercase opacity-75 mb-2">Regional Heat Vulnerability</div>
+                   <div className="progress bg-white bg-opacity-25 mb-1" style={{height: 10}}>
+                      <div className="progress-bar bg-danger" style={{width: `${currentWeather.heatwavePotential || 0}%`}}></div>
+                   </div>
+                   <div className="text-end small">UHI Thermal Loading: {currentWeather.heatwavePotential ? (currentWeather.heatwavePotential * 0.8).toFixed(1) : '0.0'}%</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
