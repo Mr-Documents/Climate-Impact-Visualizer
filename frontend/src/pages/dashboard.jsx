@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
 import CoordinateForm from "../components/forms/coordinateform";
-import { FaRobot, FaLightbulb, FaMapMarkerAlt, FaBolt, FaHistory } from "react-icons/fa";
 import { Line } from "react-chartjs-2";
 import { Circle } from "react-leaflet";
 import {
@@ -16,6 +15,11 @@ import {
   Legend
 } from "chart.js";
 import {
+  FaRobot,
+  FaLightbulb,
+  FaMapMarkerAlt,
+  FaBolt,
+  FaHistory,
   FaTemperatureHigh,
   FaCloudRain,
   FaTint,
@@ -189,8 +193,6 @@ const Dashboard = () => {
   const [predictions, setPredictions] = useState({
     rainfall: [],
     temperature: [],
-    floodProbability: 0,
-    droughtProbability: 0,
   });
 
   // Calculate dynamic actionable intelligence score based on model confidence
@@ -368,8 +370,6 @@ const Dashboard = () => {
       setPredictions({
         rainfall: [],
         temperature: [],
-        floodProbability: 0,
-        droughtProbability: 0,
       });
       setFloodRisk("--");
       setDroughtRisk("--");
@@ -531,8 +531,6 @@ const Dashboard = () => {
         setPredictions({
           rainfall: projectedRain,
           temperature: projectedTemp,
-          floodProbability: floodSc,
-          droughtProbability: droughtSc,
         });
 
         refreshAlerts(nextWeatherSummary, floodLabel, droughtLabel, heatStatus, threshold);

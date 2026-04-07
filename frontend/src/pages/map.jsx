@@ -3,25 +3,25 @@ import ReactDOMServer from "react-dom/server";
 import CoordinateForm from "../components/forms/coordinateform";
 import UnifiedMap from "../components/map/mapview";
 import axios from "axios";
-import { 
-  FaMapMarkedAlt, 
-  FaTemperatureHigh, 
-  FaLocationArrow,
-  FaWind, 
-  FaTint, 
-  FaCloud, 
-  FaSun, 
-  FaSmog, 
-  FaGlobe,
-  FaInfoCircle,
-  FaDownload,
-  FaHistory,
-  FaChartLine,
-  FaChartArea,
-  FaExclamationTriangle,
-  FaExclamationCircle,
-  FaThermometerHalf,
-  FaBolt
+import {
+    FaMapMarkedAlt,
+    FaTemperatureHigh,
+    FaLocationArrow,
+    FaWind,
+    FaTint,
+    FaCloud,
+    FaSun,
+    FaSmog,
+    FaGlobe,
+    FaInfoCircle,
+    FaDownload,
+    FaHistory,
+    FaChartLine,
+    FaChartArea,
+    FaExclamationTriangle,
+    FaExclamationCircle,
+    FaThermometerHalf,
+    FaBolt
 } from "react-icons/fa";
 import ResultCard from "../components/reusable/resultcard"; 
 import { Circle, Popup, Marker, TileLayer } from "react-leaflet";
