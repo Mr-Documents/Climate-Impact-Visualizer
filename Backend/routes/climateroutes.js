@@ -1,4 +1,5 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { getAirQuality } from '../controllers/airqualitycontroller.js';
 import { getWeatherData } from '../controllers/weathercontroller.js';
 import { getPrecipitationSoil } from '../controllers/precipitationcontroller.js';
@@ -52,8 +53,20 @@ const getModelUrl = (p) => {
   }
 })();
 
+// Stricter rate limit for AI inference
+// Prediction models are expensive to run; we limit this to 5 times per minute per user.
+const predictLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 5, 
+  message: { 
+    error: 'Too many analysis requests. Please wait a minute before analyzing a new location.' 
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Predict drought
-router.post('/predict-drought', async (req, res) => {
+router.post('/predict-drought', predictLimiter, async (req, res) => {
   try {
     if (!droughtModel) return res.status(503).json({ error: 'Drought model not loaded. Please run the training script.' });
 
@@ -73,7 +86,7 @@ router.post('/predict-drought', async (req, res) => {
 });
 
 // Predict flood
-router.post('/predict-flood', async (req, res) => {
+router.post('/predict-flood', predictLimiter, async (req, res) => {
   try {
     if (!floodModel) return res.status(503).json({ error: 'Flood model not loaded. Please run the training script.' });
 
@@ -109,7 +122,7 @@ router.get('/weather', getWeatherData);
 router.get('/precipitation', getPrecipitationSoil);
 router.get('/cloudsolar', getCloudSolar);
 router.get('/floodrisk', getFloodRisk);    
-router.post('/predict', predictClimate);      
+router.post('/predict', predictLimiter, predictClimate);      
 router.get('/historical-analysis', getHistoricalAnalysis);
 router.get('/history', getSearchHistory);
 router.get('/alerts', getGlobalAlerts);

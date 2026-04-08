@@ -540,7 +540,8 @@ const Dashboard = () => {
         setDroughtRisk("N/A");
         setFloodScore(0);
         setDroughtScore(0);
-        setLocationError("Regional analysis unavailable: Prediction models encountered a processing error.");
+        const errorMessage = error.response?.data?.error || "Regional analysis unavailable: Prediction models encountered a processing error.";
+        setLocationError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -549,7 +550,15 @@ const Dashboard = () => {
   );
 
   useEffect(() => {
-    fetchAllData(coords.lat, coords.lon);
+    // Implement a 500ms debounce to prevent spamming the AI model and Geocoding APIs
+    const handler = setTimeout(() => {
+      fetchAllData(coords.lat, coords.lon);
+    }, 500);
+
+    // Cleanup function: clears the timeout if coords change again before 500ms
+    return () => {
+      clearTimeout(handler);
+    };
   }, [coords.lat, coords.lon, fetchAllData]);
 
   useEffect(() => {
@@ -629,7 +638,7 @@ const Dashboard = () => {
             <div className="d-flex flex-wrap gap-2 align-items-center">
               <div className="bg-white bg-opacity-15 rounded-3 px-3 py-2">
                 <div className="small text-grey">Location</div>
-                <div className="fw-semibold">{coords.lat.toFixed(2)}, {coords.lon.toFixed(2)}</div>
+                <div className="fw-semibold">{coords.lat?.toFixed(2) || '--'}, {coords.lon?.toFixed(2) || '--'}</div>
               </div>
               <div className="bg-white bg-opacity-15 rounded-3 px-3 py-2">
                 <div className="small text-grey">Last refresh</div>
@@ -908,7 +917,7 @@ const Dashboard = () => {
                             {item.locations.name}
                           </div>
                           <span className="badge bg-light text-dark x-small">
-                            {item.temp_avg.toFixed(1)}°C
+                            {item.temp_avg?.toFixed(1) || '--'}°C
                           </span>
                         </div>
                         <div className="x-small text-muted">

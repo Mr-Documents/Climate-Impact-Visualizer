@@ -86,7 +86,8 @@ const FloodRiskPage = () => {
       }
     } catch (err) {
       console.error(err);
-      setLocationError("Failed to analyze flood risk. Please try again."); // Use in-app error message
+      const errorMessage = err.response?.data?.error || "Failed to analyze flood risk. Please try again.";
+      setLocationError(errorMessage);
       setData(null); // Crucial: Reset data to trigger N/A
     } finally {
       setLoading(false);
