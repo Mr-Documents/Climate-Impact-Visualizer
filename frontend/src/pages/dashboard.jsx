@@ -832,7 +832,7 @@ const Dashboard = () => {
                       <div className="progress-bar bg-warning" style={{width: `${(1-currentWeather.soilMoisture)*100}%`}}></div>
                    </div>
                    <div className="text-end small">
-                     {currentWeather.soilMoisture === null ? "N/A" : (100 - (currentWeather.soilMoisture*100)).toFixed(0) + "% Scarcity Index"}
+                     {currentWeather.soilMoisture == null ? "N/A" : (100 - (currentWeather.soilMoisture*100)).toFixed(0) + "% Scarcity Index"}
                    </div>
                 </div>
               </div>
@@ -1000,12 +1000,12 @@ const Dashboard = () => {
             label={ // Display High/Medium/Low
               loading
                 ? "--"
-                : (isWaterBody || currentWeather.maxTemp === null
+                : (isWaterBody || currentWeather.maxTemp == null
                     ? "N/A"
                     : currentWeather.heatwaveStatus)
             }
             subLabel={ // Display granular percentage
-              loading || isWaterBody || currentWeather.heatwavePotential === null ? null : `${currentWeather.heatwavePotential.toFixed(1)}% chance`
+              loading || isWaterBody || currentWeather.heatwavePotential == null ? null : `${currentWeather.heatwavePotential.toFixed(1)}% chance`
             }
             icon={<FaBolt size={22} className="text-danger" />}
           />

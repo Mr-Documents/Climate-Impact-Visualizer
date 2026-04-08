@@ -32,8 +32,8 @@ export async function predictClimateRisk(featuresSequence) {
   // Load drought and flood models once
   if (!loadedDroughtModel || !loadedFloodModel) {
     // Look for models in the same directory as this file (Backend/)
-    const droughtModelPath = path.resolve(__dirname, "saved_model_drought/model.json");
-    const floodModelPath = path.resolve(__dirname, "saved_model_flood/model.json");
+    const droughtModelPath = path.join(__dirname, "saved_model_drought", "model.json");
+    const floodModelPath = path.join(__dirname, "saved_model_flood", "model.json");
 
     if (!fs.existsSync(droughtModelPath) || !fs.existsSync(floodModelPath)) {
       throw new Error("Model files not found. Please run 'node trainClimateModel.js' first.");
