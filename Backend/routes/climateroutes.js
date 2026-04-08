@@ -8,10 +8,14 @@ import { getFloodRisk } from '../controllers/floodriskcontroller.js';
 import { predictClimate, getHistoricalAnalysis, getSearchHistory, getGlobalAlerts } from '../controllers/climatepredictcontroller.js';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Fix Windows DLL loading for Native TensorFlow
 if (process.platform === 'win32') {
-  const tfDllPath = path.resolve('node_modules/@tensorflow/tfjs-node/deps/lib');
+  const tfDllPath = path.resolve(__dirname, '..', 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
   process.env.PATH = `${process.env.PATH};${tfDllPath}`;
 }
 
@@ -33,14 +37,14 @@ const getModelUrl = (p) => {
 // Load models once when server starts
 (async () => {
   try {
-    const droughtPath = path.resolve('saved_model_drought/model.json');
+    const droughtPath = path.join(__dirname, '..', 'saved_model_drought', 'model.json');
     if (fs.existsSync(droughtPath)) {
       droughtModel = await tf.loadLayersModel(getModelUrl(droughtPath));
     } else {
       console.warn(`[WARN] Drought model not found at ${droughtPath}. Run training script first.`);
     }
 
-    const floodPath = path.resolve('saved_model_flood/model.json');
+    const floodPath = path.join(__dirname, '..', 'saved_model_flood', 'model.json');
     if (fs.existsSync(floodPath)) {
       floodModel = await tf.loadLayersModel(getModelUrl(floodPath));
     } else {
