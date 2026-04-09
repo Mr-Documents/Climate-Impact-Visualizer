@@ -28,6 +28,8 @@ ChartJS.register(
   Legend
 );
 
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+
 const DroughtRiskPage = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870, bounds: null });
   const [loading, setLoading] = useState(false);
@@ -53,7 +55,7 @@ const DroughtRiskPage = () => {
 
     try {
       // Trigger both requests simultaneously
-      const predictionPromise = axios.post("http://localhost:5000/api/predict", {
+      const predictionPromise = axios.post(`${API_BASE}/predict`, {
         latitude: lat, longitude: lon,
       });
 

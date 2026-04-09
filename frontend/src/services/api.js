@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
 export const getFloodRisk = async (lat, lon, ai = false) => {
   const res = await axios.get(`${API_BASE}/floodrisk`, {

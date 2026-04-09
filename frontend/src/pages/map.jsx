@@ -57,12 +57,14 @@ ChartJS.register(
   BarController
 );
 
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+
 // --- Weather Overlay Configuration ---
 // IMPORTANT: You need an OpenWeatherMap API key for the weather overlays to work.
 // 1. Go to https://openweathermap.org/api
 // 2. Sign up and get your free API key.
 // 3. Replace the placeholder below with your key.
-const OWM_API_KEY = process.env.REACT_APP_OWM_API_KEY || process.env.VITE_OWM_API_KEY || 'YOUR_OPENWEATHERMAP_API_KEY';
+const OWM_API_KEY = process.env.REACT_APP_OWM_API_KEY || '';
 
 const weatherLayers = {
   precipitation: {
@@ -114,9 +116,9 @@ const MapPage = () => {
     try {
       // Concurrent fetching for all climate data points
       const [weatherRes, uvRes, airRes] = await Promise.allSettled([
-        axios.get(`http://localhost:5000/api/weather?lat=${lat}&lon=${lon}`),
-        axios.get(`http://localhost:5000/api/uv-dryness?lat=${lat}&lon=${lon}`),
-        axios.get(`http://localhost:5000/api/airquality?lat=${lat}&lon=${lon}`)
+        axios.get(`${API_BASE}/weather?lat=${lat}&lon=${lon}`),
+        axios.get(`${API_BASE}/uv-dryness?lat=${lat}&lon=${lon}`),
+        axios.get(`${API_BASE}/airquality?lat=${lat}&lon=${lon}`)
       ]);
 
       setData({
@@ -168,7 +170,7 @@ const MapPage = () => {
     setHistoricalAnalysis(null); // Reset to ensure loading state shows correctly
     setHistError(null);
     try {
-      const res = await axios.get(`http://localhost:5000/api/historical-analysis?lat=${lat}&lon=${lon}&start_year=${year}`);
+      const res = await axios.get(`${API_BASE}/historical-analysis?lat=${lat}&lon=${lon}&start_year=${year}`);
       console.log("Historical Data Received:", res.data);
       if (res.data && res.data.raw) {
         setHistoricalAnalysis(res.data);
@@ -529,7 +531,7 @@ const MapPage = () => {
                           : 'btn-outline-secondary bg-white border-secondary-subtle hover-shadow'
                       }`}
                       onClick={() => toggleOverlay(key)}
-                      disabled={OWM_API_KEY.includes('YOUR_OPENWEATHERMAP_API_KEY')}
+                  disabled={!OWM_API_KEY}
                     >
                       {layer.icon}
                       {layer.name}

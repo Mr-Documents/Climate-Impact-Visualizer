@@ -42,6 +42,8 @@ ChartJS.register(
   Legend
 );
 
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+
 // ----- Helpers -----
 const humanizeRisk = (label) => {
   if (label === "--") return "--";
@@ -207,7 +209,7 @@ const Dashboard = () => {
 
   const fetchHistory = useCallback(async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/history");
+      const res = await axios.get(`${API_BASE}/history`);
       setSearchHistory(res.data);
     } catch (err) {
       console.error("Failed to fetch search history:", err);
@@ -382,12 +384,12 @@ const Dashboard = () => {
       try {
         // Use allSettled so one failed service doesn't crash the entire dashboard
         const results = await Promise.allSettled([
-          axios.get(`http://localhost:5000/api/weather?lat=${lat}&lon=${lon}`),
-          axios.post(`http://localhost:5000/api/predict`, { latitude: lat, longitude: lon }),
+          axios.get(`${API_BASE}/weather?lat=${lat}&lon=${lon}`),
+          axios.post(`${API_BASE}/predict`, { latitude: lat, longitude: lon }),
           axios.get(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`, { 
             headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } 
           }).catch(() => null),
-          axios.get(`http://localhost:5000/api/historical-analysis?lat=${lat}&lon=${lon}`)
+          axios.get(`${API_BASE}/historical-analysis?lat=${lat}&lon=${lon}`)
         ]);
 
         const weatherRes = results[0].status === 'fulfilled' ? results[0].value : null;

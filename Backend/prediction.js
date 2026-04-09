@@ -7,10 +7,10 @@ const __dirname = path.dirname(__filename);
 
 // Fix Windows DLL loading
 if (process.platform === 'win32') {
-  const tfDllPath = path.resolve(__dirname, '..', 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
-  if (!process.env.PATH.includes(tfDllPath)) { // Prevent adding multiple times if already present
-    process.env.PATH = `${process.env.PATH}${path.delimiter}${tfDllPath}`;
-  }
+    const tfDllPath = path.resolve(__dirname, '..', 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
+    if (fs.existsSync(tfDllPath) && !process.env.PATH.includes(tfDllPath)) {
+        process.env.PATH = `${process.env.PATH}${path.delimiter}${tfDllPath}`;
+    }
 }
 
 // Dynamic import to apply PATH change first

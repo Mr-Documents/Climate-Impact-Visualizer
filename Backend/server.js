@@ -1,11 +1,22 @@
 import express from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import climateRoutes from './routes/climateroutes.js';
 
+dotenv.config();
+
 const app = express();
 
-app.use(cors());
+// Trust proxy is essential for rate-limiting to work correctly on hosting platforms like Render or AWS
+app.set('trust proxy', 1);
+
+// Professional CORS configuration
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : 'http://localhost:3000',
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 
 // General rate limiter to protect the API from basic spam/DDoS
 const apiLimiter = rateLimit({
@@ -18,9 +29,9 @@ const apiLimiter = rateLimit({
 
 // **This is required to parse JSON bodies**
 app.use(express.json());
-app.use('/api', apiLimiter);
 
-app.use('/api', climateRoutes);
+// Mount routes with the limiter applied
+app.use('/api', apiLimiter, climateRoutes);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`));
