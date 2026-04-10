@@ -68,8 +68,7 @@ npm start
 ## 🛡 Disclaimer
 *This project was developed as a Final Year Project. The predictive models are probabilistic and intended for research and educational purposes. Always consult local emergency management agencies during extreme weather events.*
 
----
-**Developer:** Ramzy | **Project:** Climate Impact Visualizer | **Year:** 2024
+
 
 <!--
 [PROMPT_SUGGESTION]Create a CONTRIBUTING.md file for the project[/PROMPT_SUGGESTION]

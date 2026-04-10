@@ -27,6 +27,11 @@ const apiLimiter = rateLimit({
   message: { error: "Too many requests, please try again after 15 minutes." }
 });
 
+// Health check endpoint for Render/Monitoring services
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 // **This is required to parse JSON bodies**
 app.use(express.json());
 
