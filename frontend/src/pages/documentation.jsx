@@ -120,7 +120,7 @@ const DocumentationPage = () => {
               <div className="col-md-8">
                 <h4 className="fw-bold">Deployment & Support</h4>
                 <p className="mb-0 opacity-75">
-                  For enterprise integration, API access, or technical support, please contact us via the GitHub repository, "Climate-ImpactVisualizer".
+                  For integration, API access or suggestions, please contact us via thewillingdocument@gmail.com.
                 </p>
               </div>
               <div className="col-md-4 text-md-end mt-3 mt-md-0">
