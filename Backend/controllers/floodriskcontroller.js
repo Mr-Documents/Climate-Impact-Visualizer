@@ -42,10 +42,11 @@ export const getFloodRisk = async (req, res) => {
       // Use historical average for March 14
       try {
         const currentYear = new Date().getFullYear();
+        const monthDay = new Date().toISOString().slice(5, 10);
         const historicalUrls = [];
         for (let year = currentYear - 5; year < currentYear; year++) {
-          const startDate = `${year}-03-14`;
-          const endDate = `${year}-03-15`;
+          const startDate = `${year}-${monthDay}`;
+          const endDate = new Date(new Date(`${year}-${monthDay}`).getTime() + 86400000).toISOString().split('T')[0];
           historicalUrls.push(
             `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&hourly=precipitation&start_date=${startDate}&end_date=${endDate}`
           );
