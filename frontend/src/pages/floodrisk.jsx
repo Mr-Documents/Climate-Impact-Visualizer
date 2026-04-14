@@ -5,7 +5,7 @@ import WeatherIcon from "../components/ui/weathericon";
 import axios from "axios";
 import ResultCard from "../components/reusable/resultcard";
 import { Line } from 'react-chartjs-2';
-import { FaInfoCircle, FaExclamationTriangle, FaWater, FaMapMarkerAlt, FaRobot, FaShieldAlt, FaListUl } from "react-icons/fa";
+import { FaInfoCircle, FaExclamationTriangle, FaMapMarkerAlt, FaRobot, FaShieldAlt, FaListUl } from "react-icons/fa";
 import { Circle } from "react-leaflet";
 import {
   Chart as ChartJS,

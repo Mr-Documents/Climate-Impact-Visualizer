@@ -1,5 +1,5 @@
 // Dashboard.jsx - Updated with expanded dashboard sections and professional KPI cards
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
 import CoordinateForm from "../components/forms/coordinateform";
