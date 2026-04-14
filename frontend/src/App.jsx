@@ -9,7 +9,6 @@ import DroughtRisk from "./pages/droughtrisk";
 
 // Legacy/utility pages (still available but not exposed via primary navigation)
 import FloodRisk from "./pages/floodrisk";
-import Precipitation from "./pages/precipitationsoil";
 
 function App() {
   return (
@@ -24,7 +23,7 @@ function App() {
 
         {/* Legacy pages (keep for compatibility) */}
         <Route path="/flood" element={<FloodRisk />} />
-        <Route path="/precipitation" element={<Precipitation />} />
+       
       </Routes>
 
       <Footer />

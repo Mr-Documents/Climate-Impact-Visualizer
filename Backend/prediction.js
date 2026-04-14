@@ -1,10 +1,16 @@
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Fix Windows DLL loading
 if (process.platform === 'win32') {
-  const tfDllPath = path.join(process.cwd(), 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
-  process.env.PATH = `${process.env.PATH};${tfDllPath}`;
+    const tfDllPath = path.resolve(__dirname, '..', 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
+    if (fs.existsSync(tfDllPath) && !process.env.PATH.includes(tfDllPath)) {
+        process.env.PATH = `${process.env.PATH}${path.delimiter}${tfDllPath}`;
+    }
 }
 
 // Dynamic import to apply PATH change first
@@ -25,8 +31,9 @@ export async function predictClimateRisk(featuresSequence) {
 
   // Load drought and flood models once
   if (!loadedDroughtModel || !loadedFloodModel) {
-    const droughtModelPath = path.resolve("./saved_model_drought/model.json");
-    const floodModelPath = path.resolve("./saved_model_flood/model.json");
+    // Look for models in the same directory as this file (Backend/)
+    const droughtModelPath = path.join(__dirname, "saved_model_drought", "model.json");
+    const floodModelPath = path.join(__dirname, "saved_model_flood", "model.json");
 
     if (!fs.existsSync(droughtModelPath) || !fs.existsSync(floodModelPath)) {
       throw new Error("Model files not found. Please run 'node trainClimateModel.js' first.");

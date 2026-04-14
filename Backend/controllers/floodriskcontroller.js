@@ -13,6 +13,19 @@ export const getFloodRisk = async (req, res) => {
     const response = await axios.get(url);
     const { hourly } = response.data;
 
+    // 1. Detect if location is a water body before any risk calculation
+    const hourlySoil = hourly?.soil_moisture_0_1cm || [];
+    const isWater = !hourlySoil.some(v => v !== null && v !== undefined && v !== 0);
+
+    if (isWater) {
+      return res.json({
+        inputs: { precipitation: null, soilMoisture: null, windSpeed: null },
+        floodRisk: "N/A",
+        score: 0,
+        isWater: true
+      });
+    }
+
     if (!hourly || !hourly.time?.length) {
       return res.status(500).json({ error: "Missing climate data from API" });
     }
@@ -29,10 +42,11 @@ export const getFloodRisk = async (req, res) => {
       // Use historical average for March 14
       try {
         const currentYear = new Date().getFullYear();
+        const monthDay = new Date().toISOString().slice(5, 10);
         const historicalUrls = [];
         for (let year = currentYear - 5; year < currentYear; year++) {
-          const startDate = `${year}-03-14`;
-          const endDate = `${year}-03-15`;
+          const startDate = `${year}-${monthDay}`;
+          const endDate = new Date(new Date(`${year}-${monthDay}`).getTime() + 86400000).toISOString().split('T')[0];
           historicalUrls.push(
             `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&hourly=precipitation&start_date=${startDate}&end_date=${endDate}`
           );

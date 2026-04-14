@@ -8,8 +8,8 @@ const __dirname = path.dirname(__filename);
 
 // --- 0. FIX TENSORFLOW NATIVE LOADING ON WINDOWS ---
 // This fixes ERR_DLOPEN_FAILED by adding the DLL path to the system PATH before loading
-const tfDllPath = path.join(process.cwd(), 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
 if (process.platform === 'win32') {
+  const tfDllPath = path.join(process.cwd(), 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
   process.env.PATH = `${process.env.PATH};${tfDllPath}`;
 }
 

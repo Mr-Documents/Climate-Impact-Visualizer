@@ -50,10 +50,12 @@ export const getPrecipitationSoil = async (req, res) => {
     if (cleanedPrecip.every(p => p === 0)) {
       try {
         const currentYear = new Date().getFullYear();
+        const monthDay = new Date().toISOString().slice(5, 10); // "MM-DD"
+
         const historicalUrls = [];
         for (let year = currentYear - 5; year < currentYear; year++) {
-          const startDate = `${year}-03-14`;
-          const endDate = `${year}-03-15`; // next day to get full day
+          const startDate = `${year}-${monthDay}`;
+          const endDate = new Date(new Date(`${year}-${monthDay}`).getTime() + 86400000).toISOString().split('T')[0];
           historicalUrls.push(
             `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&hourly=precipitation&start_date=${startDate}&end_date=${endDate}`
           );
@@ -75,10 +77,12 @@ export const getPrecipitationSoil = async (req, res) => {
     if (cleanedPrecip[0] === 0) {
       try {
         const currentYear = new Date().getFullYear();
+        const monthDay = new Date().toISOString().slice(5, 10);
+
         const historicalUrls = [];
         for (let year = currentYear - 5; year < currentYear; year++) {
-          const startDate = `${year}-03-14`;
-          const endDate = `${year}-03-15`;
+          const startDate = `${year}-${monthDay}`;
+          const endDate = new Date(new Date(`${year}-${monthDay}`).getTime() + 86400000).toISOString().split('T')[0];
           historicalUrls.push(
             `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&hourly=precipitation&start_date=${startDate}&end_date=${endDate}`
           );
