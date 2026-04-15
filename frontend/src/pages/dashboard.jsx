@@ -419,11 +419,6 @@ const Dashboard = () => {
         // Data for Historical Trends Chart
         const rainHist = historySlice.map((s) => s.precipitation).filter(v => v !== null);
         const tempHist = historySlice.map((s) => s.temperature).filter(v => v !== null);
-        const windHist = historySlice.map((s) => s.windSpeed).filter(v => v !== null);
-        const labelsHist = historySlice.map((s) => {
-            const d = new Date(s.time);
-            return `${d.getHours()}:00`;
-        });
 
         // Summary Values (Current)
         const currentItem = weatherSeries[safeNowIndex] || {};
@@ -548,7 +543,7 @@ const Dashboard = () => {
         setLoading(false);
       }
     },
-    [refreshAlerts, fetchHistory]
+    [refreshAlerts, fetchHistory, tempThreshold]
   );
 
   useEffect(() => {

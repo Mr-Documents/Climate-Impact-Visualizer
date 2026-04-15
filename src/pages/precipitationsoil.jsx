@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import CoordinateForm from "../components/forms/coordinateform";
 import UnifiedMap from "../components/map/mapview";
-import LoadingSpinner from "../components/reusable/loadingspinner";
 import ResultCard from "../components/reusable/resultcard";
 import RainfallChart from "../components/charts/rainfallchart";
 import { FaCloudRain } from "react-icons/fa";
