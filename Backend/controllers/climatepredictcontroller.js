@@ -11,6 +11,11 @@ export async function predictClimate(req, res) {
   try {
     const { latitude, longitude } = req.body;
 
+    // Standardize precision to 4 decimal places (~11m accuracy) 
+    // to ensure consistent DB lookups and cache hits
+    const fixedLat = Number(Number(latitude).toFixed(4));
+    const fixedLon = Number(Number(longitude).toFixed(4));
+
     if (latitude == null || longitude == null) {
       return res.status(400).json({ error: 'latitude and longitude are required' });
     }
@@ -145,7 +150,7 @@ export async function predictClimate(req, res) {
       // 1. Upsert Location
       const { data: locData, error: locError } = await supabase
         .from('locations')
-        .upsert({ latitude, longitude, name: locationName }, { onConflict: 'latitude,longitude' })
+        .upsert({ latitude: fixedLat, longitude: fixedLon, name: locationName }, { onConflict: 'latitude,longitude' })
         .select()
         .single();
 
@@ -268,12 +273,15 @@ export async function getHistoricalAnalysis(req, res) {
       return res.status(400).json({ error: "Latitude and Longitude are required." });
     }
 
+    const fixedLat = Number(Number(lat).toFixed(4));
+    const fixedLon = Number(Number(lon).toFixed(4));
+
     // 1. Check Supabase for existing cached data (within last 30 days)
     const { data: cachedData } = await supabase
       .from('historical_cache')
       .select('analysis_data, created_at')
-      .eq('latitude', Number(lat).toFixed(2))
-      .eq('longitude', Number(lon).toFixed(2))
+      .eq('latitude', fixedLat)
+      .eq('longitude', fixedLon)
       .eq('start_year', start_year)
       .maybeSingle();
 
@@ -408,8 +416,8 @@ export async function getHistoricalAnalysis(req, res) {
 
     // 2. Store in Supabase cache before returning
     await supabase.from('historical_cache').upsert({
-      latitude: Number(lat).toFixed(2),
-      longitude: Number(lon).toFixed(2),
+      latitude: fixedLat,
+      longitude: fixedLon,
       start_year: start_year,
       analysis_data: result,
       created_at: new Date().toISOString()
