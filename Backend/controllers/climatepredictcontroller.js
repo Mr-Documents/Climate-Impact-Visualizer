@@ -234,6 +234,7 @@ export async function getSearchHistory(req, res) {
     if (error) throw error;
     res.json(data);
   } catch (err) {
+      console.error('[DATABASE ERROR] History fetch failed:', err.message);
     res.status(500).json({ error: 'Failed to fetch history', details: err.message });
   }
 }
@@ -251,6 +252,7 @@ export async function getGlobalAlerts(req, res) {
     if (error) throw error;
     res.json(data);
   } catch (err) {
+      console.error('[DATABASE ERROR] Alerts fetch failed:', err.message);
     res.status(500).json({ error: 'Failed to fetch alerts', details: err.message });
   }
 }

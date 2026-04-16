@@ -13,11 +13,14 @@ app.set('trust proxy', 1);
 
 // Professional CORS configuration
 const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:5173', // In case you use Vite later
-    process.env.FRONTEND_URL
-  ].filter(Boolean), // Removes undefined if FRONTEND_URL isn't set
+  origin: (origin, callback) => {
+    const allowed = [process.env.FRONTEND_URL];
+    if (process.env.NODE_ENV !== 'production') {
+      allowed.push('http://localhost:3000', 'http://localhost:5173');
+    }
+    if (!origin || allowed.includes(origin)) callback(null, true);
+    else callback(new Error('Not allowed by CORS'));
+  },
   optionsSuccessStatus: 200,
   credentials: true
 };
