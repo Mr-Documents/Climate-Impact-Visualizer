@@ -1,4 +1,3 @@
-import { FaFire, FaWater, FaCloudRain } from "react-icons/fa";
 
 function ResultCard({ title, icon, color, children }) {
   return (
