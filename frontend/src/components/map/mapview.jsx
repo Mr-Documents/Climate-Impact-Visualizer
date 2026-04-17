@@ -34,12 +34,14 @@ function MapRecenter({ lat, lon, bounds }) {
 
 // Child component to handle clicks
 function ClickableMarker({ onSelect, initialPosition }) {
-  const [position, setPosition] = useState(initialPosition);
+  const [position, setPosition] = useState(null);
 
   // Sync internal marker position when parent coordinates change (e.g., after search)
   useEffect(() => {
-    setPosition(initialPosition);
-  }, [initialPosition[0], initialPosition[1]]); // Use primitive parts to avoid array reference issues
+    if (initialPosition && initialPosition[0] !== undefined) {
+      setPosition([initialPosition[0], initialPosition[1]]);
+    }
+  }, [initialPosition]); 
 
   useMapEvents({
     click(e) {

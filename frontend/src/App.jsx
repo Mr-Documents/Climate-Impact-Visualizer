@@ -32,5 +32,4 @@ function App() {
     </BrowserRouter>
   );
 }
-console.log("NEW UI LOADED");
 export default App;
