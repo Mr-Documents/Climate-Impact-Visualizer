@@ -10,9 +10,8 @@ import DroughtRisk from "./pages/droughtrisk";
 // Legacy/utility pages (still available but not exposed via primary navigation)
 import FloodRisk from "./pages/floodrisk";
 
-document.body.innerHTML = "<h1>NEW DEPLOY ACTIVE</h1>";
 function App() {
-  document.body.innerHTML = "<h1>NEW DEPLOY ACTIVE</h1>";
+  
   return (
     
     <BrowserRouter>
