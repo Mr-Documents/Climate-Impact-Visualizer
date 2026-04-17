@@ -11,7 +11,9 @@ import DroughtRisk from "./pages/droughtrisk";
 import FloodRisk from "./pages/floodrisk";
 
 function App() {
+  
   return (
+    
     <BrowserRouter>
       <Navbar />
 
@@ -30,5 +32,4 @@ function App() {
     </BrowserRouter>
   );
 }
-
 export default App;

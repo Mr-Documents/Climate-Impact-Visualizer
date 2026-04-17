@@ -531,6 +531,7 @@ const Dashboard = () => {
         });
 
         refreshAlerts(nextWeatherSummary, floodLabel, droughtLabel, heatStatus, threshold);
+        fetchHistory();
       } catch (error) {
         console.error("Dashboard fetch error:", error);
         setFloodRisk("N/A");
@@ -583,7 +584,7 @@ const Dashboard = () => {
     }
   }, [recentSnapshot]);
 
-  const kpiCards = [
+  const kpiCards = useMemo(() => [
     {
       label: "Current Rainfall",
       value: formatMillimeters(currentWeather.rainfallLastHour),
@@ -620,7 +621,38 @@ const Dashboard = () => {
       icon: <FaExclamationTriangle size={22} className="text-danger" />,
       caption: "Real-time warnings",
     },
-  ];
+  ], [currentWeather, floodRisk, droughtRisk, loading, alerts.length, isWaterBody]);
+
+  // Memoize chart data to prevent canvas flicker and terminal warnings
+  const chartLabels = useMemo(() => Array.from({ length: 24 }, (_, i) => {
+    const d = new Date();
+    d.setHours(d.getHours() + i + 1);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }), []);
+
+  const rainfallChartData = useMemo(() => ({
+    labels: chartLabels,
+    datasets: [{
+      label: "Rainfall (mm)",
+      data: predictions.rainfall,
+      borderColor: "#17a2b8",
+      backgroundColor: "rgba(23,162,184,0.2)",
+      tension: 0.35,
+      fill: true,
+    }],
+  }), [chartLabels, predictions.rainfall]);
+
+  const tempChartData = useMemo(() => ({
+    labels: chartLabels,
+    datasets: [{
+      label: "Temperature (°C)",
+      data: predictions.temperature,
+      borderColor: "#dc3545",
+      backgroundColor: "rgba(220,53,69,0.2)",
+      tension: 0.35,
+      fill: true,
+    }],
+  }), [chartLabels, predictions.temperature]);
 
   return (
     <div className="container py-4">
@@ -825,8 +857,8 @@ const Dashboard = () => {
                 </div>
                 <div className="col-md-6">
                    <div className="small fw-bold text-uppercase opacity-75 mb-2">Water Stress Level</div>
-                   <div className="progress bg-white bg-opacity-25 mb-1" style={{height: 10}}>
-                      <div className="progress-bar bg-warning" style={{width: `${(1-currentWeather.soilMoisture)*100}%`}}></div>
+                   <div className="progress bg-white bg-opacity-25 mb-1" style={{ height: 10 }}>
+                      <div className="progress-bar bg-warning" style={{ width: `${currentWeather.soilMoisture !== null ? (1 - currentWeather.soilMoisture) * 100 : 0}%` }}></div>
                    </div>
                    <div className="text-end small">
                      {currentWeather.soilMoisture == null ? "N/A" : (100 - (currentWeather.soilMoisture*100)).toFixed(0) + "% Scarcity Index"}
@@ -1025,24 +1057,8 @@ const Dashboard = () => {
                   <div className="card border-0 shadow-sm">
                     <div className="card-body">
                       <h6 className="fw-bold">Predicted Rainfall (next hours)</h6>
-                      <Line 
-                        data={{
-                          labels: Array.from({ length: 24 }, (_, i) => {
-                            const d = new Date();
-                            d.setHours(d.getHours() + i + 1);
-                            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                          }),
-                          datasets: [
-                            {
-                              label: "Rainfall (mm)",
-                              data: predictions.rainfall,
-                              borderColor: "#17a2b8",
-                              backgroundColor: "rgba(23,162,184,0.2)",
-                              tension: 0.35,
-                              fill: true,
-                            },
-                          ],
-                        }}
+                      <Line
+                        data={rainfallChartData}
                         options={{
                           responsive: true,
                           plugins: { legend: { display: false } },
@@ -1057,23 +1073,7 @@ const Dashboard = () => {
                     <div className="card-body">
                       <h6 className="fw-bold">Temperature Projection</h6>
                       <Line
-                        data={{
-                          labels: Array.from({ length: 24 }, (_, i) => {
-                            const d = new Date();
-                            d.setHours(d.getHours() + i + 1);
-                            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                          }),
-                          datasets: [
-                            {
-                              label: "Temperature (°C)",
-                              data: predictions.temperature,
-                              borderColor: "#dc3545",
-                              backgroundColor: "rgba(220,53,69,0.2)",
-                              tension: 0.35,
-                              fill: true,
-                            },
-                          ],
-                        }}
+                        data={tempChartData}
                         options={{
                           responsive: true,
                           plugins: { legend: { display: false } },
