@@ -244,7 +244,7 @@ const DroughtRiskPage = () => {
     <div className="container py-4">
       <h2 className="mb-3 d-flex align-items-center gap-2">
         <WeatherIcon type="drought" size={35} />
-        Drought Risk Analysis (AI Model)
+        Drought Risk Analysis
       </h2>
 
       <div className="row">

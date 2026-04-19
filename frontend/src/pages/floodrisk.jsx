@@ -248,7 +248,7 @@ const FloodRiskPage = () => {
     <div className="container py-4">
       <h2 className="mb-3 d-flex align-items-center gap-2">
         <WeatherIcon type="flood" size={35} />
-        Flood Risk Analysis (AI Model)
+        Flood Risk Analysis
       </h2>
 
       <div className="row">
