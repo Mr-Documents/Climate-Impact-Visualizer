@@ -42,7 +42,7 @@ import {
 } from "chart.js";
 import L from "leaflet";
 
-// Register Chart.js components
+// Registering Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -59,11 +59,7 @@ ChartJS.register(
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
-// --- Weather Overlay Configuration ---
-// IMPORTANT: You need an OpenWeatherMap API key for the weather overlays to work.
-// 1. Go to https://openweathermap.org/api
-// 2. Sign up and get your free API key.
-// 3. Replace the placeholder below with your key.
+// Heatmap / Overlay config 
 const OWM_API_KEY = process.env.REACT_APP_OWM_API_KEY || '';
 
 const weatherLayers = {
@@ -262,8 +258,8 @@ const MapPage = () => {
     };
   }, [historicalAnalysis]);
 
-  // Calculate the local 99th percentile thresholds (Relative Thresholds)
-  // This ensures that "Extreme Heat" is defined relative to both daily peaks and daily averages.
+  // Code for Calculating the local 99th percentile thresholds (Relative Thresholds)for accuracy
+  // This is for making sure that "Extreme Heat" is defined relative to both daily peaks and daily averages.
   const heatThresholds = React.useMemo(() => {
     const raw = historicalAnalysis?.raw || {};
     const maxTemps = raw.temperature_2m_max || [];
@@ -326,7 +322,7 @@ const MapPage = () => {
     };
   }, [historicalAnalysis, heatThresholds]);
 
-  // Mock Sea Level Trend (Global Average ~3.3mm/year) for context
+  // Sea Level Trend (mck) (Global Average ~3.3mm/year) for context
   const calculateSeaLevel = (year) => {
     const baseYear = 1993;
     return Number(Math.max(0, (year - baseYear) * 3.3).toFixed(1));
