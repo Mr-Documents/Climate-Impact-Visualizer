@@ -454,9 +454,9 @@ This project is licensed under the ISC License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support & Contact
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/climate-impact-visualizer/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/climate-impact-visualizer/discussions)
-- **Email**: support@climateimpactvisualizer.com
+- **Issues**: [GitHub Issues](https://github.com/Mr-Documents/Climate-Impact-Visualizer/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Mr-Documents/Climate-Impact-Visualizer/discussions)
+- **Email**: thewillingdocument@gmail.com
 
 ---
 
@@ -468,7 +468,6 @@ This project is licensed under the ISC License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Built with ❤️ for a sustainable future**
 
 [⬆ Back to Top](#climate-impact-visualizer-civ)
 
