@@ -35,28 +35,31 @@ The **Climate Impact Visualizer** is an enterprise-grade environmental intellige
 ## 📸 Screenshots & Demo
 
 ### Dashboard Overview
-![Dashboard Overview](docs/screenshots/Dashboard Overview.png)
+![Dashboard Overview](docs/screenshots/DashboardOverview.png)
 *Main dashboard displaying real-time environmental KPIs and risk assessments*
 
-![Dashboard Overview 2](docs/screenshots/Dasboard Overview 2.png)
+![Dashboard Overview 2](docs/screenshots/DasboardOverview2.png)
 *Alternative dashboard view with detailed risk analytics*
 
 ### Geospatial Analysis
-![Geospatial Analysis](docs/screenshots/Geospacial Analysis.png)
+![Geospatial Analysis](docs/screenshots/GeospacialAnalysis.png)
 *Interactive map with precipitation, temperature, and wind velocity overlays*
 
 ### Historical Trends
-![Historical Trends](docs/screenshots/Historical Trends.png)
+![Historical Trends](docs/screenshots/HistoricalTrends.png)
 *30-year climate evolution with statistical trend analysis*
+
+![Historical Trends 2](docs/screenshots/HistoricalTrends2.png)
+*Extended historical analysis with comparative data visualization*
 
 ### Risk Predictions
 
 #### Flood Risk Assessment
-![Flood Risk](docs/screenshots/Flood Risk.png)
+![Flood Risk](docs/screenshots/FloodRisk.png)
 *AI-generated flood risk predictions with confidence intervals*
 
 #### Drought Risk Assessment
-![Drought Risk](docs/screenshots/Drought Risk.png)
+![Drought Risk](docs/screenshots/DroughtRisk.png)
 *AI-generated drought risk predictions with aridity analysis*
 
 ---
