@@ -969,7 +969,7 @@ const Dashboard = () => {
               <div className="d-flex align-items-center justify-content-between mb-3">
                 <div className="d-flex align-items-center gap-2 fw-bold">
                   <FaMapMarkedAlt size={24} className="text-primary" />
-                  <span>AI Risk Map (Visual Upgrade)</span>
+                  <span>Risk Map</span>
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   {Object.entries(mapLayers).map(([key, enabled]) => (
