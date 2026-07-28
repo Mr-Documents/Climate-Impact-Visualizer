@@ -1,4 +1,3 @@
-// Dashboard.jsx - Updated with expanded dashboard sections and professional KPI cards
 import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
@@ -44,7 +43,6 @@ ChartJS.register(
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
-// ----- Helpers -----
 const humanizeRisk = (label) => {
   if (label === "--") return "--";
   if (!label || label === "N/A") return "N/A";
@@ -61,8 +59,8 @@ const getRiskColor = (risk) => {
   const r = risk.toString().toLowerCase();
   const val = parseFloat(r);
 
-  // Handle numeric percentages (like Heatwave Potential)
-  // Normalize 0-1 scores (AI) to 0-100 for threshold checking
+  // To Handle numeric percentages (like the Heatwave Potential)
+  // To Normalize 0-1 scores (AI) to 0-100 for threshold checking
   if (!isNaN(val)) {
     const normalizedVal = val <= 1.0 ? val * 100 : val;
     if (normalizedVal >= 70) return "#dc3545";
@@ -87,7 +85,7 @@ const computeAverage = (arr) => {
   return filtered.reduce((sum, v) => sum + v, 0) / filtered.length;
 };
 
-// Helper to calculate heat stress based on temperature relative to a threshold
+// This for calculating heat stress based on the temperature relative to a threshold
 const calculateHeatStress = (temp, threshold) => {
   if (threshold <= 0) return 0.05;
   // Use a wider window for smoother probability distribution
@@ -197,7 +195,7 @@ const Dashboard = () => {
     temperature: [],
   });
 
-  // Calculate dynamic actionable intelligence score based on model confidence
+  // For Calculating dynamic actionable intelligence score based on model confidence
   const actionableScore = useMemo(() => {
     if (isWaterBody) return "0%";
     if (loading) return "--%";
@@ -339,7 +337,7 @@ const Dashboard = () => {
     [tempThreshold]
   );
 
-  // Handle manual coordinate submission with validation
+  // For Handling manual coordinate submission with validation (If correct)
   const handleManualCoordinates = (latStr, lonStr) => {
     const lat = parseFloat(latStr);
     const lon = parseFloat(lonStr);
@@ -357,7 +355,7 @@ const Dashboard = () => {
   const fetchAllData = useCallback(
     async (lat, lon) => {
       setLoading(true);
-      // Reset states to show "--" (wipe) during refresh
+      // Reset states to show "--" during refresh
       setCurrentWeather({
         temperature: null,
         maxTemp: null,
@@ -399,7 +397,7 @@ const Dashboard = () => {
 
         if (!weatherRes || !predictionRes) throw new Error("Core climate services unavailable.");
 
-        // --- Weather ---
+        // Weather 
         const weatherSeries = weatherRes?.data?.series || [];
         
         // Find "Now" index to split into History (past 24h) and Future (next 24h)
@@ -427,7 +425,7 @@ const Dashboard = () => {
         const avgTemp = computeAverage(tempHist);
         const maxTemp24h = tempHist.length > 0 ? Math.max(...tempHist) : (currentItem.temperature ?? null);
 
-        // --- Localized Heatwave Logic (Yesterday, Today, Tomorrow) ---
+        // Localized Heatwave Logic (Yesterday, Today, Tomorrow) 
         // If the API limit is hit, we keep the existing threshold instead of reverting to 35
         let threshold = tempThreshold;
         if (histRes?.status === 'fulfilled' && histRes.value.data?.insights?.tempThreshold) {
@@ -531,6 +529,7 @@ const Dashboard = () => {
         });
 
         refreshAlerts(nextWeatherSummary, floodLabel, droughtLabel, heatStatus, threshold);
+        fetchHistory();
       } catch (error) {
         console.error("Dashboard fetch error:", error);
         setFloodRisk("N/A");
@@ -583,7 +582,7 @@ const Dashboard = () => {
     }
   }, [recentSnapshot]);
 
-  const kpiCards = [
+  const kpiCards = useMemo(() => [
     {
       label: "Current Rainfall",
       value: formatMillimeters(currentWeather.rainfallLastHour),
@@ -620,7 +619,38 @@ const Dashboard = () => {
       icon: <FaExclamationTriangle size={22} className="text-danger" />,
       caption: "Real-time warnings",
     },
-  ];
+  ], [currentWeather, floodRisk, droughtRisk, loading, alerts.length, isWaterBody]);
+
+  // Memoize chart data to prevent canvas flicker and terminal warnings
+  const chartLabels = useMemo(() => Array.from({ length: 24 }, (_, i) => {
+    const d = new Date();
+    d.setHours(d.getHours() + i + 1);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }), []);
+
+  const rainfallChartData = useMemo(() => ({
+    labels: chartLabels,
+    datasets: [{
+      label: "Rainfall (mm)",
+      data: predictions.rainfall,
+      borderColor: "#17a2b8",
+      backgroundColor: "rgba(23,162,184,0.2)",
+      tension: 0.35,
+      fill: true,
+    }],
+  }), [chartLabels, predictions.rainfall]);
+
+  const tempChartData = useMemo(() => ({
+    labels: chartLabels,
+    datasets: [{
+      label: "Temperature (°C)",
+      data: predictions.temperature,
+      borderColor: "#dc3545",
+      backgroundColor: "rgba(220,53,69,0.2)",
+      tension: 0.35,
+      fill: true,
+    }],
+  }), [chartLabels, predictions.temperature]);
 
   return (
     <div className="container py-4">
@@ -825,8 +855,8 @@ const Dashboard = () => {
                 </div>
                 <div className="col-md-6">
                    <div className="small fw-bold text-uppercase opacity-75 mb-2">Water Stress Level</div>
-                   <div className="progress bg-white bg-opacity-25 mb-1" style={{height: 10}}>
-                      <div className="progress-bar bg-warning" style={{width: `${(1-currentWeather.soilMoisture)*100}%`}}></div>
+                   <div className="progress bg-white bg-opacity-25 mb-1" style={{ height: 10 }}>
+                      <div className="progress-bar bg-warning" style={{ width: `${currentWeather.soilMoisture !== null ? (1 - currentWeather.soilMoisture) * 100 : 0}%` }}></div>
                    </div>
                    <div className="text-end small">
                      {currentWeather.soilMoisture == null ? "N/A" : (100 - (currentWeather.soilMoisture*100)).toFixed(0) + "% Scarcity Index"}
@@ -939,7 +969,7 @@ const Dashboard = () => {
               <div className="d-flex align-items-center justify-content-between mb-3">
                 <div className="d-flex align-items-center gap-2 fw-bold">
                   <FaMapMarkedAlt size={24} className="text-primary" />
-                  <span>AI Risk Map (Visual Upgrade)</span>
+                  <span>Risk Map</span>
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   {Object.entries(mapLayers).map(([key, enabled]) => (
@@ -1025,24 +1055,8 @@ const Dashboard = () => {
                   <div className="card border-0 shadow-sm">
                     <div className="card-body">
                       <h6 className="fw-bold">Predicted Rainfall (next hours)</h6>
-                      <Line 
-                        data={{
-                          labels: Array.from({ length: 24 }, (_, i) => {
-                            const d = new Date();
-                            d.setHours(d.getHours() + i + 1);
-                            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                          }),
-                          datasets: [
-                            {
-                              label: "Rainfall (mm)",
-                              data: predictions.rainfall,
-                              borderColor: "#17a2b8",
-                              backgroundColor: "rgba(23,162,184,0.2)",
-                              tension: 0.35,
-                              fill: true,
-                            },
-                          ],
-                        }}
+                      <Line
+                        data={rainfallChartData}
                         options={{
                           responsive: true,
                           plugins: { legend: { display: false } },
@@ -1057,23 +1071,7 @@ const Dashboard = () => {
                     <div className="card-body">
                       <h6 className="fw-bold">Temperature Projection</h6>
                       <Line
-                        data={{
-                          labels: Array.from({ length: 24 }, (_, i) => {
-                            const d = new Date();
-                            d.setHours(d.getHours() + i + 1);
-                            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                          }),
-                          datasets: [
-                            {
-                              label: "Temperature (°C)",
-                              data: predictions.temperature,
-                              borderColor: "#dc3545",
-                              backgroundColor: "rgba(220,53,69,0.2)",
-                              tension: 0.35,
-                              fill: true,
-                            },
-                          ],
-                        }}
+                        data={tempChartData}
                         options={{
                           responsive: true,
                           plugins: { legend: { display: false } },
