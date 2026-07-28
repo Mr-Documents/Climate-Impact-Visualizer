@@ -50,12 +50,22 @@ export async function predictClimateRisk(featuresSequence) {
       tf.loadLayersModel(getModelUrl(droughtModelPath)),
       tf.loadLayersModel(getModelUrl(floodModelPath))
     ]);
+
+    console.log("Drought model input:", loadedDroughtModel.inputs[0].shape);
+    console.log("Flood model input:", loadedFloodModel.inputs[0].shape);
   }
 
   // Use tf.tidy to clean up all intermediate tensors (input, output, etc.) automatically
   const result = tf.tidy(() => {
     // Prepare input tensor (shape: [1, TIME_STEPS, numFeatures])
-    const inputTensor = tf.tensor3d([featuresSequence]);
+   console.log("Sequence length:", featuresSequence.length);
+console.log("Features per timestep:", featuresSequence[0]?.length);
+
+const inputTensor = tf.tensor3d([featuresSequence]);
+
+console.log("Input tensor shape:", inputTensor.shape);
+
+console.log("About to predict...");
 
     // Predict drought
     const droughtOutput = loadedDroughtModel.predict(inputTensor);
