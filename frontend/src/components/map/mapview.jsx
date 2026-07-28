@@ -36,10 +36,11 @@ function MapRecenter({ lat, lon, bounds }) {
 function ClickableMarker({ onSelect, initialPosition }) {
   const [position, setPosition] = useState(initialPosition);
 
-  // Sync internal marker position when parent coordinates change (e.g., after search)
+  const [lat, lon] = initialPosition;
+
   useEffect(() => {
     setPosition(initialPosition);
-  }, [initialPosition[0], initialPosition[1]]); // Use primitive parts to avoid array reference issues
+  }, [initialPosition, lat, lon]); // Use primitive parts to avoid array reference issues
 
   useMapEvents({
     click(e) {
