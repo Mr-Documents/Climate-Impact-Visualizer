@@ -59,6 +59,13 @@ function loadCsv(filePath) {
 }
 
 /**
+ * Parses a CSV field, mapping an empty cell to NaN so downstream validity
+ * checks reject it. Number('') is 0, which would otherwise turn a missing
+ * reading into bone-dry soil or zero rainfall.
+ */
+const num = (v) => (v === undefined || v === null || v === '' ? NaN : Number(v));
+
+/**
  * Parses the YYYYMMDDTHHMM timestamp used by both datasets. The global export
  * carries a trailing padding digit, so we slice by position rather than length.
  * Times are local to each city (Open-Meteo was queried with timezone=auto),
@@ -100,22 +107,26 @@ function loadCitySeries() {
       const p = line.split(',');
       const t = parseTimestamp(p[0]);
       if (!t) continue;
-      const rec = {
+      records.push({
         ...t,
-        temp: +p[ci.temp], humidity: +p[ci.hum], soil: +p[ci.soil],
-        windSpeed: +p[ci.wind], windDir: +p[ci.dir], precip: +p[ci.precip],
-        vpd: +p[ci.vpd] * BASEL_VPD_HPA_TO_KPA
-      };
-      records.push(rec);
+        temp: num(p[ci.temp]), humidity: num(p[ci.hum]), soil: num(p[ci.soil]),
+        windSpeed: num(p[ci.wind]), windDir: num(p[ci.dir]), precip: num(p[ci.precip]),
+        vpd: num(p[ci.vpd]) * BASEL_VPD_HPA_TO_KPA
+      });
     }
     cities['Basel'] = records;
   }
 
-  // Global export: five cities sharing one timestamp column, VPD already kPa.
+  // Global export: many cities sharing one timestamp column, VPD already kPa.
+  // City names are discovered from the header so adding a location to
+  // fetch_training_data.js requires no change here.
   const globalPath = path.join(__dirname, 'data', 'training_dataset.csv');
   if (fs.existsSync(globalPath)) {
     const { header, lines } = loadCsv(globalPath);
-    const names = ['Addis_Ababa', 'Nairobi', 'Sao_Paulo', 'Madrid', 'Accra'];
+    const names = header
+      .filter(h => h.endsWith('_Temp'))
+      .map(h => h.slice(0, -'_Temp'.length));
+
     const cols = {};
     for (const n of names) {
       cols[n] = {
@@ -134,9 +145,9 @@ function loadCitySeries() {
         const c = cols[n];
         cities[n].push({
           ...t,
-          temp: +p[c.temp], humidity: +p[c.hum], soil: +p[c.soil],
-          windSpeed: +p[c.wind], windDir: +p[c.dir], precip: +p[c.precip],
-          vpd: +p[c.vpd]
+          temp: num(p[c.temp]), humidity: num(p[c.hum]), soil: num(p[c.soil]),
+          windSpeed: num(p[c.wind]), windDir: num(p[c.dir]), precip: num(p[c.precip]),
+          vpd: num(p[c.vpd])
         });
       }
     }
@@ -182,8 +193,18 @@ function buildSequences(records) {
     const future = window.slice(TIME_STEPS);
 
     const precipSum = future.reduce((s, r) => s + Math.max(0, r.precip), 0);
+    const soilNow = history[history.length - 1].soil;
+    const soilFuture = future[future.length - 1].soil;
+
+    // Target the CHANGE in soil moisture, not its level. Soil is strongly
+    // autocorrelated over 24h, so predicting the level lets the network score
+    // well by echoing its input - and when the training set spans regimes as
+    // different as Manila and a frozen Winnipeg, it instead regresses toward
+    // the global mean and loses to persistence outright. Predicting the delta
+    // makes persistence the zero-prediction: the model starts level with the
+    // baseline and can only add value from there.
     xs.push(history.map(encodeFeatures));
-    ys.push([future[future.length - 1].soil, Math.log1p(precipSum)]);
+    ys.push([soilFuture - soilNow, Math.log1p(precipSum)]);
   }
   return { xs, ys };
 }
@@ -223,9 +244,13 @@ const toFlatTensor2d = (rows, scaler) => {
 };
 
 // --- 5. MODEL ---
+// 64 units sufficed for six broadly similar climates, but the 12-city set spans
+// regimes as different as equatorial Manila and a frozen Winnipeg, where soil
+// dynamics invert. The wider layer gives the network room to represent them
+// separately instead of averaging across them.
 function createModel() {
   const model = tf.sequential();
-  model.add(tf.layers.lstm({ units: 64, inputShape: [TIME_STEPS, NUM_FEATURES], returnSequences: false }));
+  model.add(tf.layers.lstm({ units: 128, inputShape: [TIME_STEPS, NUM_FEATURES], returnSequences: false }));
   model.add(tf.layers.dropout({ rate: 0.2 }));
   model.add(tf.layers.dense({ units: 32, activation: 'relu' }));
   model.add(tf.layers.dense({ units: 2 })); // linear: regression, not classification
@@ -258,12 +283,14 @@ async function main() {
     valX.push(...valSeq.xs); valY.push(...valSeq.ys);
 
     // Baseline uses the same validation windows, so the comparison is like-for-like.
+    // With a delta target, persistence IS the zero prediction: "soil will not
+    // change". RMSE is unaffected by the reframing, since predicted and actual
+    // are both offset by the same current value, so these figures stay directly
+    // comparable with the earlier absolute-target runs.
     for (let i = 0; i < valSeq.xs.length; i++) {
-      const lastStep = valSeq.xs[i][TIME_STEPS - 1];
-      const soilNow = lastStep[2];
       const precipPrev24 = valSeq.xs[i].reduce((s, step) => s + Math.expm1(step[4]), 0);
       baseline.push({
-        predSoil: soilNow, trueSoil: valSeq.ys[i][0],
+        predSoilDelta: 0, trueSoilDelta: valSeq.ys[i][0],
         predPrecip: precipPrev24, truePrecip: Math.expm1(valSeq.ys[i][1])
       });
     }
@@ -312,6 +339,8 @@ async function main() {
   const base = { soil: { se: 0, ae: 0 }, precip: { se: 0, ae: 0 } };
 
   for (let i = 0; i < pred.length; i++) {
+    // Both are soil-moisture DELTAS; the error is identical to that of the
+    // reconstructed absolute value, so RMSE stays in m^3/m^3.
     const soilHat = pred[i][0] * targetScaler.std[0] + targetScaler.mean[0];
     const precipHat = Math.max(0, Math.expm1(pred[i][1] * targetScaler.std[1] + targetScaler.mean[1]));
     const soilTrue = valY[i][0];
@@ -320,8 +349,10 @@ async function main() {
     metrics.soil.se += (soilHat - soilTrue) ** 2; metrics.soil.ae += Math.abs(soilHat - soilTrue);
     metrics.precip.se += (precipHat - precipTrue) ** 2; metrics.precip.ae += Math.abs(precipHat - precipTrue);
 
-    base.soil.se += (baseline[i].predSoil - soilTrue) ** 2; base.soil.ae += Math.abs(baseline[i].predSoil - soilTrue);
-    base.precip.se += (baseline[i].predPrecip - precipTrue) ** 2; base.precip.ae += Math.abs(baseline[i].predPrecip - precipTrue);
+    base.soil.se += (baseline[i].predSoilDelta - soilTrue) ** 2;
+    base.soil.ae += Math.abs(baseline[i].predSoilDelta - soilTrue);
+    base.precip.se += (baseline[i].predPrecip - precipTrue) ** 2;
+    base.precip.ae += Math.abs(baseline[i].predPrecip - precipTrue);
   }
   const n = pred.length;
   const fmt = (m) => `RMSE=${Math.sqrt(m.se / n).toFixed(4)} MAE=${(m.ae / n).toFixed(4)}`;
@@ -344,7 +375,9 @@ async function main() {
       horizon: HORIZON,
       features: featureScaler,
       targets: targetScaler,
-      targetNames: ['soil_moisture_t+24h', 'log1p_precip_sum_24h'],
+      targetNames: ['soil_moisture_delta_24h', 'log1p_precip_sum_24h'],
+      // Consumers must add target[0] to the most recent observed soil moisture.
+      soilTargetIsDelta: true,
       trainedAt: new Date().toISOString()
     }, null, 2)
   );

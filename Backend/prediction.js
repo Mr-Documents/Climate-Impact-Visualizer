@@ -103,14 +103,19 @@ export async function predictClimateRisk({ history, recentPrecipHourly = [], dry
     return loadedModel.predict(input).arraySync()[0];
   });
 
-  // Denormalize back into physical units.
-  const soilForecast = raw[0] * scaler.targets.std[0] + scaler.targets.mean[0];
+  const latest = window[window.length - 1];
+
+  // Denormalize back into physical units. The model predicts the CHANGE in soil
+  // moisture over 24h, so it is added to the latest observation; scaler.json
+  // records this via soilTargetIsDelta. Models trained before that change
+  // emitted the absolute level, so fall back to using the value directly.
+  const soilRaw = raw[0] * scaler.targets.std[0] + scaler.targets.mean[0];
+  const soilForecast = scaler.soilTargetIsDelta ? latest.soil + soilRaw : soilRaw;
+
   const precipForecast = Math.max(
     0,
     Math.expm1(raw[1] * scaler.targets.std[1] + scaler.targets.mean[1])
   );
-
-  const latest = window[window.length - 1];
   const api7d = antecedentPrecipitationIndex(recentPrecipHourly);
   const effectiveDryDays = Number.isFinite(dryDays) ? dryDays : drySpellDays(recentPrecipHourly);
 
