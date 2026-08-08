@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import util from "util";
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -13,7 +14,17 @@ if (process.platform === 'win32') {
     }
 }
 
-// Dynamic import to apply PATH change first
+// tfjs-node calls util.isArray and util.isNullOrUndefined, which Node removed in v23.
+// Restore them so the native backend runs on hosts that provide a newer runtime than
+// the one pinned in .node-version. Both are no-ops on Node 18-22, where they still exist.
+if (typeof util.isArray !== 'function') {
+    util.isArray = Array.isArray;
+}
+if (typeof util.isNullOrUndefined !== 'function') {
+    util.isNullOrUndefined = (value) => value === null || value === undefined;
+}
+
+// Dynamic import to apply PATH and util changes first
 const tf = await import("@tensorflow/tfjs-node");
 
 let loadedDroughtModel = null;

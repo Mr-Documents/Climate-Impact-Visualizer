@@ -71,7 +71,7 @@ const DroughtRiskPage = () => {
       console.log("DroughtRisk - Nominatim geocoding response:", geoRes?.data);
       setData(res.data);
 
-      // Logic to show local name + English name in brackets
+      // For showing local name + English name in brackets
       const englishName = geoRes?.data?.display_name?.split(',').slice(0, 3).join(',') || "";
       const backendName = res.data?.locationName || "Selected Coordinate";
 

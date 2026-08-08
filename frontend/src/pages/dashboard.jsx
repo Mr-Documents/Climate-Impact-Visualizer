@@ -1,4 +1,3 @@
-// Dashboard.jsx - Updated with expanded dashboard sections and professional KPI cards
 import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
@@ -44,7 +43,6 @@ ChartJS.register(
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
-// ----- Helpers -----
 const humanizeRisk = (label) => {
   if (label === "--") return "--";
   if (!label || label === "N/A") return "N/A";
@@ -61,8 +59,8 @@ const getRiskColor = (risk) => {
   const r = risk.toString().toLowerCase();
   const val = parseFloat(r);
 
-  // Handle numeric percentages (like Heatwave Potential)
-  // Normalize 0-1 scores (AI) to 0-100 for threshold checking
+  // To Handle numeric percentages (like the Heatwave Potential)
+  // To Normalize 0-1 scores (AI) to 0-100 for threshold checking
   if (!isNaN(val)) {
     const normalizedVal = val <= 1.0 ? val * 100 : val;
     if (normalizedVal >= 70) return "#dc3545";
@@ -87,7 +85,7 @@ const computeAverage = (arr) => {
   return filtered.reduce((sum, v) => sum + v, 0) / filtered.length;
 };
 
-// Helper to calculate heat stress based on temperature relative to a threshold
+// This for calculating heat stress based on the temperature relative to a threshold
 const calculateHeatStress = (temp, threshold) => {
   if (threshold <= 0) return 0.05;
   // Use a wider window for smoother probability distribution
@@ -197,7 +195,7 @@ const Dashboard = () => {
     temperature: [],
   });
 
-  // Calculate dynamic actionable intelligence score based on model confidence
+  // For Calculating dynamic actionable intelligence score based on model confidence
   const actionableScore = useMemo(() => {
     if (isWaterBody) return "0%";
     if (loading) return "--%";
@@ -339,7 +337,7 @@ const Dashboard = () => {
     [tempThreshold]
   );
 
-  // Handle manual coordinate submission with validation
+  // For Handling manual coordinate submission with validation (If correct)
   const handleManualCoordinates = (latStr, lonStr) => {
     const lat = parseFloat(latStr);
     const lon = parseFloat(lonStr);
@@ -357,7 +355,7 @@ const Dashboard = () => {
   const fetchAllData = useCallback(
     async (lat, lon) => {
       setLoading(true);
-      // Reset states to show "--" (wipe) during refresh
+      // Reset states to show "--" during refresh
       setCurrentWeather({
         temperature: null,
         maxTemp: null,
@@ -399,7 +397,7 @@ const Dashboard = () => {
 
         if (!weatherRes || !predictionRes) throw new Error("Core climate services unavailable.");
 
-        // --- Weather ---
+        // Weather 
         const weatherSeries = weatherRes?.data?.series || [];
         
         // Find "Now" index to split into History (past 24h) and Future (next 24h)
@@ -427,7 +425,7 @@ const Dashboard = () => {
         const avgTemp = computeAverage(tempHist);
         const maxTemp24h = tempHist.length > 0 ? Math.max(...tempHist) : (currentItem.temperature ?? null);
 
-        // --- Localized Heatwave Logic (Yesterday, Today, Tomorrow) ---
+        // Localized Heatwave Logic (Yesterday, Today, Tomorrow) 
         // If the API limit is hit, we keep the existing threshold instead of reverting to 35
         let threshold = tempThreshold;
         if (histRes?.status === 'fulfilled' && histRes.value.data?.insights?.tempThreshold) {
@@ -971,7 +969,7 @@ const Dashboard = () => {
               <div className="d-flex align-items-center justify-content-between mb-3">
                 <div className="d-flex align-items-center gap-2 fw-bold">
                   <FaMapMarkedAlt size={24} className="text-primary" />
-                  <span>AI Risk Map (Visual Upgrade)</span>
+                  <span>Risk Map</span>
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   {Object.entries(mapLayers).map(([key, enabled]) => (

@@ -54,7 +54,7 @@ const FloodRiskPage = () => {
     setLocationError(null);
 
     try {
-      // Start both requests in parallel
+      // To Start both requests in parallel
       const predictionPromise = axios.post(`${API_BASE}/predict`, {
         latitude: lat, longitude: lon,
       });
@@ -62,7 +62,7 @@ const FloodRiskPage = () => {
       const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`;
       const geoPromise = axios.get(geoUrl, { headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } });
 
-      // Wait for both to complete
+      // To Wait for both to complete
       const [response, geoRes] = await Promise.all([
         predictionPromise,
         geoPromise.catch(() => null) // Ensure geocoding errors don't block the AI result
@@ -182,7 +182,7 @@ const FloodRiskPage = () => {
 
   const chartData = history ? {
     labels: history.time.map((t, i) => {
-      // Attempt to parse; replace space with 'T' for better ISO compatibility
+      // Attempt to parse; try to replace space with 'T' for better ISO compatibility
       let dateObj = new Date(typeof t === 'string' ? t.replace(' ', 'T') : t);
       
       if (isNaN(dateObj.getTime())) {

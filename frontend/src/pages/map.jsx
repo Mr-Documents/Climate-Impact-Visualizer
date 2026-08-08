@@ -42,7 +42,7 @@ import {
 } from "chart.js";
 import L from "leaflet";
 
-// Register Chart.js components
+// Registering Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -59,11 +59,7 @@ ChartJS.register(
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
-// --- Weather Overlay Configuration ---
-// IMPORTANT: You need an OpenWeatherMap API key for the weather overlays to work.
-// 1. Go to https://openweathermap.org/api
-// 2. Sign up and get your free API key.
-// 3. Replace the placeholder below with your key.
+// Heatmap / Overlay config 
 const OWM_API_KEY = process.env.REACT_APP_OWM_API_KEY || '';
 
 const weatherLayers = {
@@ -110,6 +106,7 @@ const MapPage = () => {
   const [locationName, setLocationName] = useState("");
   const [startYear, setStartYear] = useState(new Date().getFullYear() - 30);
   const [chartType, setChartType] = useState('line'); // 'line' or 'bar'
+  const yearsDuration = new Date().getFullYear() - startYear;
 
   const fetchAllClimateData = useCallback(async (lat, lon) => {
     setLoading(true);
@@ -262,8 +259,8 @@ const MapPage = () => {
     };
   }, [historicalAnalysis]);
 
-  // Calculate the local 99th percentile thresholds (Relative Thresholds)
-  // This ensures that "Extreme Heat" is defined relative to both daily peaks and daily averages.
+  // Code for Calculating the local 99th percentile thresholds (Relative Thresholds)for accuracy
+  // This is for making sure that "Extreme Heat" is defined relative to both daily peaks and daily averages.
   const heatThresholds = React.useMemo(() => {
     const raw = historicalAnalysis?.raw || {};
     const maxTemps = raw.temperature_2m_max || [];
@@ -326,7 +323,7 @@ const MapPage = () => {
     };
   }, [historicalAnalysis, heatThresholds]);
 
-  // Mock Sea Level Trend (Global Average ~3.3mm/year) for context
+  // Sea Level Trend (mck) (Global Average ~3.3mm/year) for context
   const calculateSeaLevel = (year) => {
     const baseYear = 1993;
     return Number(Math.max(0, (year - baseYear) * 3.3).toFixed(1));
@@ -599,8 +596,8 @@ const MapPage = () => {
         <div className="card shadow-sm border-0 p-4">
           <div className="d-flex flex-column flex-md-row align-items-md-start justify-content-between mb-4 gap-3">
             <div>
-              <h4 className="fw-bold mb-1"><FaHistory className="text-primary me-2"/> 30-Year Climate Evolution</h4>
-              <p className="text-muted small mb-0">Visualizing environmental shifts and extreme events since {startYear}.</p>
+              <h4 className="fw-bold mb-1"><FaHistory className="text-primary me-2"/> {yearsDuration}-Year Climate Evolution</h4>
+              <p className="text-muted small mb-0">Visualizing environmental shifts and extreme events since {startYear} ({yearsDuration} years).</p>
             </div>
             <div className="d-flex flex-wrap gap-2">
               <select 
@@ -638,7 +635,7 @@ const MapPage = () => {
                     <h6 className="fw-bold small text-uppercase text-secondary">Trend Analysis</h6>
                     <div className="h3">+{historicalAnalysis.insights?.tempTrend ?? '0'}°C</div>
                     <p className="small text-danger mb-0 fw-bold mt-2">
-                      “Average temperature has increased by {historicalAnalysis.insights?.tempTrend ?? '0'}°C over the last 30 years.”
+                      “Average temperature has increased by {historicalAnalysis.insights?.tempTrend ?? '0'}°C over the last {yearsDuration} years.”
                     </p>
                  </div>
               </div>
@@ -647,7 +644,7 @@ const MapPage = () => {
                     <h6 className="fw-bold small text-uppercase text-secondary">Anomaly Detection</h6>
                     <div className="h3">{historicalAnalysis.insights?.rainAnomaly ?? '0'}%</div>
                     <p className="small text-info mb-0 fw-bold mt-2">
-                      “Recent rainfall is {historicalAnalysis.insights?.rainAnomaly ?? '0'}% {historicalAnalysis.insights?.rainAnomaly > 0 ? 'above' : 'below'} the 30-year average.”
+                      “Recent rainfall is {historicalAnalysis.insights?.rainAnomaly ?? '0'}% {historicalAnalysis.insights?.rainAnomaly > 0 ? 'above' : 'below'} the {yearsDuration}-year average.”
                     </p>
                  </div>
               </div>
@@ -708,7 +705,7 @@ const MapPage = () => {
                               <FaExclamationTriangle /> Disaster Risk Impact
                             </h6>
                             <p className="small mb-3">
-                              Extreme events are defined by the local 30-year climate record (99th percentile). 
+                              Extreme events are defined by the local {yearsDuration}-year climate record (99th percentile). 
                               <br/><strong>Peak Heat</strong>: Top 1% of daily maximums (&gt;{heatThresholds.max.toFixed(1)}°C). 
                               <br/><strong>Mean Heat</strong>: Top 1% of daily averages (&gt;{heatThresholds.mean.toFixed(1)}°C).
                               <br/><strong>Heavy Rain</strong>: Top 5% of wet days (&gt;{historicalAnalysis.insights?.extremeRainThreshold || 50}mm).
@@ -837,7 +834,7 @@ const MapPage = () => {
 
                   {seasonalData && <div className="bg-light p-4 rounded shadow-sm border text-center w-100">
                     <h6 className="fw-bold mb-4 d-flex align-items-center justify-content-center gap-2">
-                      <FaGlobe className="text-success"/> 4. Seasonal Climatology (30-Year Monthly Averages)
+                      <FaGlobe className="text-success"/> 4. Seasonal Climatology ({yearsDuration}-Year Monthly Averages)
                     </h6>
                     <Bar 
                       data={{
@@ -937,7 +934,7 @@ const MapPage = () => {
                     <div className="p-3 border rounded bg-white shadow-sm h-100">
                       <h6 className="fw-bold small text-uppercase mb-2 text-primary">5. Correlation Insights</h6>
                       <p className="small mb-0">
-                        Statistical analysis shows a <strong>strong correlation</strong> between high humidity spikes and subsequent flood markers in this specific location's 30-year dataset.
+                        Statistical analysis shows a <strong>strong correlation</strong> between high humidity spikes and subsequent flood markers in this specific location's {yearsDuration}-year dataset.
                       </p>
                     </div>
                   </div>

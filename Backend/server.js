@@ -12,14 +12,31 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Professional CORS configuration
+// FRONTEND_URL may hold a comma-separated list, e.g. the Vercel production domain
+// plus any preview domains. Trailing slashes are stripped so that a value like
+// "https://example.vercel.app/" still matches the browser's Origin header.
+const normalizeOrigin = (url) => url.trim().replace(/\/+$/, '');
+
+const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map(normalizeOrigin)
+  .filter(Boolean);
+
+if (process.env.NODE_ENV !== 'production') {
+  allowedOrigins.push('http://localhost:3000', 'http://localhost:5173');
+}
+
+if (allowedOrigins.length === 0) {
+  console.warn('[CORS] FRONTEND_URL is not set — all browser requests will be blocked.');
+}
+
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowed = [process.env.FRONTEND_URL];
-    if (process.env.NODE_ENV !== 'production') {
-      allowed.push('http://localhost:3000', 'http://localhost:5173');
-    }
-    if (!origin || allowed.includes(origin)) callback(null, true);
-    else callback(new Error('Not allowed by CORS'));
+    // No Origin header means a non-browser client (curl, health checks) — always allow.
+    if (!origin) return callback(null, true);
+    // Signal a disallowed origin by omitting the CORS headers rather than throwing,
+    // which would surface as an opaque 500 instead of a clear CORS failure.
+    callback(null, allowedOrigins.includes(normalizeOrigin(origin)));
   },
   optionsSuccessStatus: 200,
   credentials: true
@@ -47,6 +64,6 @@ app.use(express.json());
 app.use('/api', apiLimiter, climateRoutes);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, "0.0.0.0", () => 
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`)
+app.listen(PORT, "0.0.0.0", () =>
+  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT} (Node ${process.version})`)
 );
