@@ -7,8 +7,9 @@
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
+  "_comment_engines": "Pinned to Node 18.x for @tensorflow/tfjs-node: its native C++ backend is only reliable up to Node 18, and it imports the legacy util.isNullOrUndefined, which Node removed in v23. An open upper bound lets the host install a Node version where /api/predict fails at runtime.",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   },
   "keywords": [],
   "author": "",
