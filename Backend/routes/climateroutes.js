@@ -5,6 +5,7 @@ import { getWeatherData } from '../controllers/weathercontroller.js';
 import { getPrecipitationSoil } from '../controllers/precipitationcontroller.js';
 import { getCloudSolar } from '../controllers/cloudsolarcontroller.js';
 import { getFloodRisk } from '../controllers/floodriskcontroller.js';
+import { getUVDryness } from '../controllers/uvdrynesscontroller.js';
 import { predictClimate, getHistoricalAnalysis, getSearchHistory, getGlobalAlerts } from '../controllers/climatepredictcontroller.js';
 
 const router = express.Router();
@@ -25,7 +26,8 @@ router.get('/airquality', getAirQuality);
 router.get('/weather', getWeatherData);
 router.get('/precipitation', getPrecipitationSoil);
 router.get('/cloudsolar', getCloudSolar);
-router.get('/floodrisk', getFloodRisk);    
+router.get('/floodrisk', getFloodRisk);
+router.get('/uv-dryness', getUVDryness);
 router.post('/predict', predictLimiter, predictClimate);      
 router.get('/historical-analysis', getHistoricalAnalysis);
 router.get('/history', getSearchHistory);
