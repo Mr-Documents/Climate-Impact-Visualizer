@@ -2,13 +2,18 @@ import path from "path";
 import fs from "fs";
 import util from "util";
 import { fileURLToPath } from 'url';
+import { NUM_FEATURES, encodeFeatures, applyScaler } from './features.js';
+import {
+  computeDroughtRisk, computeFloodRisk,
+  antecedentPrecipitationIndex, drySpellDays
+} from './riskIndex.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Fix Windows DLL loading
 if (process.platform === 'win32') {
-    const tfDllPath = path.resolve(__dirname, '..', 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
+    const tfDllPath = path.resolve(__dirname, 'node_modules', '@tensorflow', 'tfjs-node', 'deps', 'lib');
     if (fs.existsSync(tfDllPath) && !process.env.PATH.includes(tfDllPath)) {
         process.env.PATH = `${process.env.PATH}${path.delimiter}${tfDllPath}`;
     }
@@ -27,71 +32,108 @@ if (typeof util.isNullOrUndefined !== 'function') {
 // Dynamic import to apply PATH and util changes first
 const tf = await import("@tensorflow/tfjs-node");
 
-let loadedDroughtModel = null;
-let loadedFloodModel = null;
+const MODEL_DIR = path.join(__dirname, "saved_model_forecast");
+
+let loadedModel = null;
+let scaler = null;
 
 /**
- * Predicts flood and drought risk using trained LSTM models
- * @param {number[][]} featuresSequence - array of [TIME_STEPS, numFeatures]
+ * Loads the forecast model and, critically, the scaling statistics saved
+ * alongside it. Feeding raw values into a model trained on normalized inputs
+ * saturates the network and pins its output constant regardless of location -
+ * the failure mode this pipeline replaced.
  */
+async function ensureLoaded() {
+  if (loadedModel && scaler) return;
 
-export async function predictClimateRisk(featuresSequence) {
-  if (!Array.isArray(featuresSequence) || featuresSequence.length === 0) {
-    throw new Error("featuresSequence must be a non-empty 2D array");
+  const modelPath = path.join(MODEL_DIR, "model.json");
+  const scalerPath = path.join(MODEL_DIR, "scaler.json");
+
+  if (!fs.existsSync(modelPath) || !fs.existsSync(scalerPath)) {
+    throw new Error(
+      "Forecast model not found. Run 'node trainForecastModel.js' to build saved_model_forecast."
+    );
   }
 
-  // Load drought and flood models once
-  if (!loadedDroughtModel || !loadedFloodModel) {
-    // Look for models in the same directory as this file (Backend/)
-    const droughtModelPath = path.join(__dirname, "saved_model_drought", "model.json");
-    const floodModelPath = path.join(__dirname, "saved_model_flood", "model.json");
+  scaler = JSON.parse(fs.readFileSync(scalerPath, 'utf8'));
 
-    if (!fs.existsSync(droughtModelPath) || !fs.existsSync(floodModelPath)) {
-      throw new Error("Model files not found. Please run 'node trainClimateModel.js' first.");
-    }
+  // Build the file:// URL manually to avoid %20 encoding of spaces in the path.
+  let resolved = path.resolve(modelPath);
+  if (process.platform === 'win32') resolved = resolved.replace(/\\/g, '/');
+  loadedModel = await tf.loadLayersModel(`file://${resolved}`);
+}
 
-    // Helper to format path for tfjs-node (avoiding %20 encoding issues)
-    const getModelUrl = (p) => {
-      let resolved = path.resolve(p);
-      if (process.platform === 'win32') resolved = resolved.replace(/\\/g, '/');
-      return `file://${resolved}`;
-    };
+/**
+ * Forecasts the next 24 hours and converts that forecast into drought and flood
+ * risk bands.
+ *
+ * @param {object} input
+ * @param {object[]} input.history - hourly observations, most recent LAST, at least
+ *        scaler.timeSteps entries. Each: { temp, humidity, soil, windSpeed,
+ *        windDir, precip, vpd, hour, month }
+ * @param {number[]} [input.recentPrecipHourly] - up to 168h of rainfall (mm),
+ *        most recent last, used for antecedent wetness and dry-spell length
+ * @param {number} [input.dryDays] - dry-spell length in days. Pass this when a
+ *        longer archive than the hourly window is available; otherwise it is
+ *        derived from recentPrecipHourly.
+ * @returns {Promise<{drought:object, flood:object, forecast:object}>}
+ */
+export async function predictClimateRisk({ history, recentPrecipHourly = [], dryDays }) {
+  if (!Array.isArray(history) || history.length === 0) {
+    throw new Error("history must be a non-empty array of hourly observations");
+  }
+  await ensureLoaded();
 
-    [loadedDroughtModel, loadedFloodModel] = await Promise.all([
-      tf.loadLayersModel(getModelUrl(droughtModelPath)),
-      tf.loadLayersModel(getModelUrl(floodModelPath))
-    ]);
+  const steps = scaler.timeSteps;
+  if (history.length < steps) {
+    throw new Error(`history needs at least ${steps} hourly records, received ${history.length}`);
+  }
+  const window = history.slice(-steps);
+
+  // Encode and scale with the SAVED training statistics.
+  const flat = new Float32Array(steps * NUM_FEATURES);
+  let k = 0;
+  for (const record of window) {
+    const scaled = applyScaler(encodeFeatures(record), scaler.features);
+    for (let j = 0; j < NUM_FEATURES; j++) flat[k++] = scaled[j];
   }
 
-  // Use tf.tidy to clean up all intermediate tensors (input, output, etc.) automatically
-  const result = tf.tidy(() => {
-    // Prepare input tensor (shape: [1, TIME_STEPS, numFeatures])
-    const inputTensor = tf.tensor3d([featuresSequence]);
-
-    // Predict drought
-    const droughtOutput = loadedDroughtModel.predict(inputTensor);
-    const droughtScores = droughtOutput.arraySync(); // Use synchronous arraySync inside tidy
-    const droughtIndex = droughtScores[0].indexOf(Math.max(...droughtScores[0]));
-
-    // Predict flood
-    const floodOutput = loadedFloodModel.predict(inputTensor);
-    const floodScores = floodOutput.arraySync();
-    const floodIndex = floodScores[0].indexOf(Math.max(...floodScores[0]));
-
-    // Convert numeric index to label
-    const labels = ["Low", "Medium", "High"];
-
-    return {
-      drought: {
-        score: Number(droughtScores[0][droughtIndex].toFixed(3)),
-        label: labels[droughtIndex]
-      },
-      flood: {
-        score: Number(floodScores[0][floodIndex].toFixed(3)),
-        label: labels[floodIndex]
-      }
-    };
+  const raw = tf.tidy(() => {
+    const input = tf.tensor3d(flat, [1, steps, NUM_FEATURES]);
+    return loadedModel.predict(input).arraySync()[0];
   });
 
-  return result;
+  // Denormalize back into physical units.
+  const soilForecast = raw[0] * scaler.targets.std[0] + scaler.targets.mean[0];
+  const precipForecast = Math.max(
+    0,
+    Math.expm1(raw[1] * scaler.targets.std[1] + scaler.targets.mean[1])
+  );
+
+  const latest = window[window.length - 1];
+  const api7d = antecedentPrecipitationIndex(recentPrecipHourly);
+  const effectiveDryDays = Number.isFinite(dryDays) ? dryDays : drySpellDays(recentPrecipHourly);
+
+  const drought = computeDroughtRisk({
+    soil: soilForecast,
+    vpd: latest.vpd,
+    dryDays: effectiveDryDays,
+    forecastPrecip24h: precipForecast
+  });
+  const flood = computeFloodRisk({
+    soil: soilForecast,
+    forecastPrecip24h: precipForecast,
+    api7d
+  });
+
+  return {
+    drought,
+    flood,
+    forecast: {
+      soilMoisture24h: Number(soilForecast.toFixed(4)),
+      precip24hMm: Number(precipForecast.toFixed(2)),
+      antecedentPrecipIndexMm: Number(api7d.toFixed(2)),
+      drySpellDays: Number(effectiveDryDays.toFixed(2))
+    }
+  };
 }

@@ -1,6 +1,8 @@
 // controllers/predictionClimate.js
 import fetch from 'node-fetch';
 import { predictClimateRisk } from '../prediction.js';
+import { vapourPressureDeficit, composeSoilMoisture0to7 } from '../features.js';
+import { drySpellDaysFromDaily } from '../riskIndex.js';
 import { supabase } from '../routes/supabaseClient.js';
 
 /**
@@ -32,8 +34,15 @@ export async function predictClimate(req, res) {
     const snapshotRes = await fetch(snapshotUrl);
     const snapshotData = await snapshotRes.json();
 
-    // Fetch current weather from Open-Meteo
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,soil_moisture_0_1cm&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,soil_moisture_0_1cm,uv_index,vapour_pressure_deficit&past_days=1&forecast_days=1`;
+    // Fetch current weather from Open-Meteo.
+    // soil_moisture_0_to_7cm matches the depth band the model was trained on. The
+    // 0-1cm skin layer used previously is a different, far more volatile quantity
+    // and produced a train/serve mismatch on the most important feature.
+    // past_days=7 supplies the antecedent rainfall the flood index needs, and
+    // timezone=auto matches the local-time convention of the training data.
+    // The banded layers are requested as a fallback: several regions (notably
+    // North America) return null for soil_moisture_0_to_7cm entirely.
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,soil_moisture_0_to_7cm&hourly=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,soil_moisture_0_to_7cm,soil_moisture_0_to_1cm,soil_moisture_1_to_3cm,soil_moisture_3_to_9cm,uv_index,vapour_pressure_deficit&past_days=7&forecast_days=1&timezone=auto`;
     const response = await fetch(url);
     const data = await response.json();
 
@@ -42,11 +51,22 @@ export async function predictClimate(req, res) {
     const precipitation = current.precipitation || 0;
     const windSpeed = current.wind_speed_10m || 0;
     const temperature = current.temperature_2m || 25;
+    // Resolve the 0-7cm layer once, falling back to the banded reconstruction
+    // where the direct value is unavailable, then use that series everywhere.
+    const rawHourly = data.hourly || {};
+    const hourlySoil = (rawHourly.time || []).map((_, i) => composeSoilMoisture0to7({
+      direct: rawHourly.soil_moisture_0_to_7cm?.[i],
+      band0to1: rawHourly.soil_moisture_0_to_1cm?.[i],
+      band1to3: rawHourly.soil_moisture_1_to_3cm?.[i],
+      band3to9: rawHourly.soil_moisture_3_to_9cm?.[i]
+    }));
+
     // Robust water detection: If soil moisture is entirely null or strictly zero across the series, treat as water/invalid.
-    const hourlySoil = data.hourly?.soil_moisture_0_1cm || [];
     const isWater = !hourlySoil.some(v => v !== null && v !== undefined && v !== 0);
 
-    let soilMoisture = current.soil_moisture_0_1cm;
+    let soilMoisture = Number.isFinite(current.soil_moisture_0_to_7cm)
+      ? current.soil_moisture_0_to_7cm
+      : hourlySoil.find(Number.isFinite);
     // Default for safety if terrestrial, but flag ensures prediction is bypassed if water
     if (isWater) soilMoisture = 0; 
 
@@ -61,7 +81,10 @@ export async function predictClimate(req, res) {
     // Find the index closest to now (or just take the last 24 hours available up to now)
     // Open-Meteo returns data starting from 00:00 yesterday (due to past_days=1). 
     // We take the slice ending at the current hour.
-    const nowISO = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH
+    // With timezone=auto the API returns local timestamps, so "now" must be
+    // shifted by the location's UTC offset before matching against them.
+    const utcOffsetMs = (data.utc_offset_seconds ?? 0) * 1000;
+    const nowISO = new Date(Date.now() + utcOffsetMs).toISOString().slice(0, 13); // YYYY-MM-DDTHH
     if (len === 0) throw new Error("Meteorological data arrays are empty.");
 
     let currentIndex = hourly.time.findIndex(t => t.startsWith(nowISO));
@@ -71,9 +94,9 @@ export async function predictClimate(req, res) {
     // Extract current UV and VPD from hourly data using the currentIndex
     const uvIndex = hourly.uv_index ? hourly.uv_index[currentIndex] : 0;
     
-    // Calculate current VPD manually for higher precision based on current temp/humidity
-    const currentSvp = 0.6108 * Math.exp((17.27 * temperature) / (temperature + 237.3));
-    const vpdValue = currentSvp * (1 - ((current.relative_humidity_2m || 60) / 100));
+    // Shared Magnus-Tetens implementation, so the displayed VPD and the value
+    // fed to the model are computed identically.
+    const vpdValue = vapourPressureDeficit(temperature, current.relative_humidity_2m ?? 60);
 
     // Prepare historical data for visualization (last 24h)
     const historyData = {
@@ -84,65 +107,69 @@ export async function predictClimate(req, res) {
       precipitation: [],
       windSpeed: []
     };
-    const featuresSequence = [];
+    // Hourly observations for the model, oldest first. Encoding happens in
+    // features.js so training and inference can never diverge.
+    const modelHistory = [];
+
+    // Use ?? rather than || so a legitimate zero (0 C, calm wind, dry soil) is
+    // kept instead of being replaced by the current-conditions fallback.
+    const firstFinite = (...values) => values.find(Number.isFinite) ?? 0;
 
     for (let i = TIME_STEPS - 1; i >= 0; i--) {
       const idx = currentIndex - i;
-      
-      const hTemp = hourly.temperature_2m[idx] || temperature;
-      const hHum = hourly.relative_humidity_2m[idx] || humidity;
-      const hSoil = hourly.soil_moisture_0_1cm[idx] || soilMoisture;
-      const hWind = hourly.wind_speed_10m[idx] || windSpeed;
-      const hDir = hourly.wind_direction_10m[idx] || 0;
-      
+
+      const hTemp = firstFinite(hourly.temperature_2m?.[idx], temperature);
+      const hHum = firstFinite(hourly.relative_humidity_2m?.[idx], humidity);
+      const hSoil = firstFinite(hourlySoil[idx], soilMoisture);
+      const hWind = firstFinite(hourly.wind_speed_10m?.[idx], windSpeed);
+      const hDir = firstFinite(hourly.wind_direction_10m?.[idx], 0);
+      const hPrecip = firstFinite(hourly.precipitation?.[idx], 0);
+
+      const timeStr = hourly.time?.[idx];
+      if (!timeStr) continue;
+
+      // Parse the local ISO string positionally. Using new Date().getHours()
+      // would reinterpret it in the server's timezone, which on Render is UTC
+      // and would shift every location's diurnal cycle.
+      const hour = Number(timeStr.slice(11, 13));
+      const month = Number(timeStr.slice(5, 7));
+
       // Collect history for frontend charts
-      if (hourly.time && hourly.time[idx]) {
-        const tDate = new Date(hourly.time[idx]);
-        historyData.time.push(`${tDate.getHours()}:00`);
-        historyData.temperature.push(hTemp);
-        historyData.humidity.push(hHum);
-        historyData.soilMoisture.push(hSoil);
-        historyData.precipitation.push(hourly.precipitation ? hourly.precipitation[idx] : 0);
-        historyData.windSpeed.push(hWind);
-      }
+      historyData.time.push(`${hour}:00`);
+      historyData.temperature.push(hTemp);
+      historyData.humidity.push(hHum);
+      historyData.soilMoisture.push(hSoil);
+      historyData.precipitation.push(hPrecip);
+      historyData.windSpeed.push(hWind);
 
-      // Calculate derived features matching training script
-      // 1. VPD
-      // SVP = 0.6108 * exp(17.27 * T / (T + 237.3))
-      const svp = 0.6108 * Math.exp((17.27 * hTemp) / (hTemp + 237.3));
-      const vpd = svp * (1 - (hHum / 100));
-
-      // 2. Wind vector
-      const rad = hDir * (Math.PI / 180);
-      const sinWind = Math.sin(rad);
-      const cosWind = Math.cos(rad);
-
-      // 3. Time
-      const date = new Date(hourly.time[idx]);
-      const hour = date.getHours();
-      const month = date.getMonth() + 1;
-
-      // Feature vector must match trainClimateModel.js order:
-      // [temp, humidity, soil, windSpeed, vpd, sinWind, cosWind, hour, month]
-      featuresSequence.push([
-        hTemp,
-        hHum,
-        hSoil,
-        hWind,
-        vpd,
-        sinWind,
-        cosWind,
+      modelHistory.push({
+        temp: hTemp,
+        humidity: hHum,
+        soil: hSoil,
+        windSpeed: hWind,
+        windDir: hDir,
+        precip: hPrecip,
+        vpd: vapourPressureDeficit(hTemp, hHum),
         hour,
         month
-      ]);
+      });
     }
+
+    // Rainfall over the past week drives antecedent wetness and dry-spell length.
+    const recentPrecipHourly = (hourly.precipitation || [])
+      .slice(0, currentIndex + 1)
+      .map(v => (Number.isFinite(v) ? v : 0));
 
     // Call the updated prediction function (flood + drought)
     // Default to '--' if water/invalid so frontend treats it as invalid data
     let prediction = { drought: { score: 0, label: 'N/A' }, flood: { score: 0, label: 'N/A' } };
-    
+
+    // The 30-day archive snapshot is already fetched above, so use it for the
+    // dry-spell term rather than the 7-day hourly window.
+    const dryDays = drySpellDaysFromDaily(snapshotData?.daily?.precipitation_sum || []);
+
     if (!isWater) {
-      prediction = await predictClimateRisk(featuresSequence);
+      prediction = await predictClimateRisk({ history: modelHistory, recentPrecipHourly, dryDays });
     }
 
     // --- Persist to Supabase ---
