@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Raw and processed climate data are reproducible from scripts/ and are far too
+# large for version control. locations.csv is the exception: it defines the
+# sample and must be versioned for results to be reproducible.
+data/raw/
+data/external/
+data/processed/*
+!data/processed/locations.csv
+
+# Trained artefacts are reproducible from train.py; evaluation reports are
+# committed because they are the record of what was actually measured.
+models/*.joblib
