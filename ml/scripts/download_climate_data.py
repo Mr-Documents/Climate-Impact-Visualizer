@@ -28,6 +28,7 @@ from climate_ml.data.locations import Location, draw_replacement
 from climate_ml.data.openmeteo import (
     AcquisitionError,
     RateLimitError,
+    TransientError,
     estimated_request_weight,
     fetch_location,
 )
@@ -81,6 +82,7 @@ def main() -> int:
                     args.budget, int(args.budget // weight))
 
     spent = 0.0
+    network_failures = 0
     rng = np.random.default_rng(config.SAMPLE_SEED + 1)
     accepted = list(locations)
     records: list[dict] = []
@@ -89,6 +91,9 @@ def main() -> int:
     for index, original in enumerate(locations, start=1):
         candidate = original
         for attempt in range(MAX_REPLACEMENTS_PER_SLOT):
+            # NOTE: only AcquisitionError reaches the replacement path below.
+            # Rate limiting and network failure both `continue` without
+            # consuming an attempt.
             try:
                 result = fetch_location(candidate, force=args.force)
             except RateLimitError as exc:
@@ -101,6 +106,21 @@ def main() -> int:
                     args.cooldown_min,
                 )
                 time.sleep(args.cooldown_min * 60)
+                continue
+            except TransientError as exc:
+                # Network or server failure. Also NOT the location's fault, so
+                # the same rule applies: wait, retry this point, never replace it.
+                # A shorter wait than the rate-limit cooldown, because
+                # connectivity usually returns sooner than a quota resets.
+                wait_min = min(args.cooldown_min, 5.0 * (2 ** min(network_failures, 4)))
+                network_failures += 1
+                logger.warning(
+                    "[%3d/%3d] %s: network unavailable - waiting %.0f min, retry %d "
+                    "(same location). %s",
+                    index, len(locations), candidate.location_id, wait_min,
+                    network_failures, str(exc)[:120],
+                )
+                time.sleep(wait_min * 60)
                 continue
             except AcquisitionError as exc:
                 logger.warning("[%3d/%3d] %s rejected: %s", index, len(locations),

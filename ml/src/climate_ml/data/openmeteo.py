@@ -37,6 +37,18 @@ class AcquisitionError(RuntimeError):
     """The location itself is unusable - e.g. every value is null over ice."""
 
 
+class TransientError(RuntimeError):
+    """The network or server failed us, not the location.
+
+    DNS failures, connection resets and 5xx responses say nothing about whether
+    a coordinate is usable. Treating them as rejections is what a nine-hour
+    connectivity outage exposed: 119 perfectly good locations were discarded
+    because ``getaddrinfo`` failed, burning ~96 replacement draws and silently
+    destroying the land-area-proportional sample. These must be waited out and
+    retried on the SAME location, exactly like rate limiting.
+    """
+
+
 class RateLimitError(RuntimeError):
     """The API throttled us. Transient, and emphatically NOT a bad location.
 
@@ -72,6 +84,7 @@ def _request(latitude: float, longitude: float) -> dict:
     }
 
     last_error: Exception | None = None
+    last_was_transient = False
     for attempt in range(1, config.MAX_RETRIES + 1):
         try:
             response = requests.get(
@@ -86,8 +99,16 @@ def _request(latitude: float, longitude: float) -> dict:
             return payload
         except RateLimitError:
             raise
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            # No DNS, no route, or the server never answered. Nothing to do with
+            # this coordinate.
+            last_error, last_was_transient = exc, True
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else 0
+            # 5xx is the server having a bad day; 4xx means our request is wrong.
+            last_error, last_was_transient = exc, status >= 500
         except Exception as exc:  # noqa: BLE001 - retried and re-raised below
-            last_error = exc
+            last_error, last_was_transient = exc, False
             if attempt == config.MAX_RETRIES:
                 break
             backoff = 2 ** attempt * config.REQUEST_PAUSE_S
@@ -97,9 +118,12 @@ def _request(latitude: float, longitude: float) -> dict:
             )
             time.sleep(backoff)
 
-    raise AcquisitionError(
+    message = (
         f"failed after {config.MAX_RETRIES} attempts at ({latitude}, {longitude}): {last_error}"
     )
+    # The distinction matters enormously: a transient failure must never cause
+    # the caller to discard and replace this location.
+    raise TransientError(message) if last_was_transient else AcquisitionError(message)
 
 
 def _validate(frame: pd.DataFrame, location_id: str) -> None:

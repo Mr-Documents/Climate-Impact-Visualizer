@@ -1,0 +1,15 @@
+﻿2026-09-11 08:50:57  downloader exited (code 1) at 10/60 - restarting in 300 s
+2026-09-11 08:55:57  starting downloader (10/60 cached)
+08:56:01 INFO Each location costs ~783 weighted calls; free tier allows 10,000/day (~12.8 locations/day).
+08:56:01 INFO [  1/ 60] L0000 cached  rows=10958  elev=23m  eta=0min
+08:56:01 INFO [  2/ 60] L0001 cached  rows=10958  elev=140m  eta=0min
+08:56:01 INFO [  3/ 60] L0002 cached  rows=10958  elev=186m  eta=0min
+08:56:01 INFO [  4/ 60] L0003 cached  rows=10958  elev=485m  eta=0min
+08:56:01 INFO [  5/ 60] L0004 cached  rows=10958  elev=254m  eta=0min
+08:56:01 INFO [  6/ 60] L0005 cached  rows=10958  elev=26m  eta=0min
+08:56:01 INFO [  7/ 60] L0006 cached  rows=10958  elev=892m  eta=0min
+08:56:01 INFO [  8/ 60] L0007 cached  rows=10958  elev=465m  eta=0min
+08:56:01 INFO [  9/ 60] L0008 cached  rows=10958  elev=177m  eta=0min
+08:56:01 INFO [ 10/ 60] L0009 cached  rows=10958  elev=179m  eta=0min
+08:56:14 INFO [ 11/ 60] L0010 fetched  rows=10958  elev=541m  eta=1min
+08:56:17 WARNING [ 12/ 60] L0011: HTTP 429 - hourly or daily quota exhausted - sleeping 61 min then retrying same location
