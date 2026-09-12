@@ -7,6 +7,7 @@ import { getCloudSolar } from '../controllers/cloudsolarcontroller.js';
 import { getFloodRisk } from '../controllers/floodriskcontroller.js';
 import { getUVDryness } from '../controllers/uvdrynesscontroller.js';
 import { predictClimate, getHistoricalAnalysis, getSearchHistory, getGlobalAlerts } from '../controllers/climatepredictcontroller.js';
+import { getMlRisk, getMlHealth } from '../controllers/mlriskcontroller.js';
 
 const router = express.Router();
 
@@ -32,5 +33,11 @@ router.post('/predict', predictLimiter, predictClimate);
 router.get('/historical-analysis', getHistoricalAnalysis);
 router.get('/history', getSearchHistory);
 router.get('/alerts', getGlobalAlerts);
+
+// Python ML service: trained flood and drought classifiers. Shares the stricter
+// predictLimiter because a cold request costs the upstream climate provider a
+// 30-year fetch, which is expensive against a daily quota.
+router.post('/ml-risk', predictLimiter, getMlRisk);
+router.get('/ml-health', getMlHealth);
 
 export default router;
