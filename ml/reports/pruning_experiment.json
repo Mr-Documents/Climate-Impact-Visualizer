@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-09-12T19:41:00+00:00",
+  "question": "Does the single-split pruning gain survive grouped cross-validation?",
+  "answer": "No. Drought's +0.0298 single-split gain is +0.0016 under grouped CV (pruned wins 3 of 6 folds). Flood is -0.0015 (1 of 6). Both are noise; the full 29-feature set is retained.",
+  "basis": "6-fold GroupKFold over train+validation, whole locations held out, same training windows and recency weighting as production",
+  "targets": {
+    "flood": {
+      "full": {
+        "mean": 0.1461,
+        "sd": 0.0249,
+        "folds": [
+          0.1416,
+          0.1521,
+          0.143,
+          0.1029,
+          0.1884,
+          0.1483
+        ],
+        "n_features": 29
+      },
+      "pruned": {
+        "mean": 0.1446,
+        "sd": 0.0242,
+        "folds": [
+          0.1408,
+          0.149,
+          0.1434,
+          0.1022,
+          0.1856,
+          0.1467
+        ],
+        "n_features": 23
+      },
+      "pruned_wins_folds": "1/6",
+      "delta": -0.0015
+    },
+    "drought": {
+      "full": {
+        "mean": 0.5609,
+        "sd": 0.0174,
+        "folds": [
+          0.5356,
+          0.5633,
+          0.5662,
+          0.5571,
+          0.5505,
+          0.5929
+        ],
+        "n_features": 29
+      },
+      "pruned": {
+        "mean": 0.5625,
+        "sd": 0.0192,
+        "folds": [
+          0.5352,
+          0.5597,
+          0.5697,
+          0.5624,
+          0.5503,
+          0.5978
+        ],
+        "n_features": 25
+      },
+      "pruned_wins_folds": "3/6",
+      "delta": 0.0016
+    }
+  }
+}

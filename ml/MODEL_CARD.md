@@ -197,37 +197,77 @@ threshold was tuned on validation and applied unchanged.
 
 ### Model selection
 
-Selected on validation PR-AUC. Accuracy is not reported: with a 3.8% positive
-rate, predicting "no flood" every day scores 96.2% and is useless.
+Selected on **6-fold grouped cross-validation PR-AUC**, folds split by location
+so every score measures performance on places the model has not seen. Accuracy
+is not reported: with a 3.8% positive rate, predicting "no flood" every day
+scores 96.2% and is useless.
 
-**Flood** (validation PR-AUC)
+The single-split validation column is shown beside it because the two disagree,
+and that disagreement mattered (§10).
 
-| Model | Tier | PR-AUC |
-|---|---|---|
-| base_rate | baseline | 0.0358 |
-| persistence | baseline | 0.0895 |
-| logistic_regression | baseline | 0.1292 |
-| **random_forest** | candidate | **0.2453** ← selected |
-| gradient_boosting | candidate | 0.1911 |
+**Flood**
 
-**Drought** (validation PR-AUC)
+| Model | Tier | Grouped CV PR-AUC | Single-split val |
+|---|---|---|---|
+| base_rate | baseline | 0.0277 ± 0.0063 | 0.0358 |
+| persistence | baseline | 0.0464 ± 0.0140 | 0.0895 |
+| logistic_regression | baseline | 0.1298 ± 0.0202 | 0.1292 |
+| **random_forest** | candidate | **0.1461 ± 0.0249** ← selected | 0.2453 |
+| gradient_boosting | candidate | 0.1306 ± 0.0172 | 0.1911 |
 
-| Model | Tier | PR-AUC |
-|---|---|---|
-| base_rate | baseline | 0.2351 |
-| persistence | baseline | 0.4557 |
-| logistic_regression | baseline | 0.6081 |
-| **random_forest** | candidate | **0.6238** ← selected |
-| gradient_boosting | candidate | 0.6077 |
+**Drought**
+
+| Model | Tier | Grouped CV PR-AUC | Single-split val |
+|---|---|---|---|
+| base_rate | baseline | 0.1921 ± 0.0265 | 0.2351 |
+| persistence | baseline | 0.3868 ± 0.0217 | 0.4557 |
+| logistic_regression | baseline | 0.5521 ± 0.0267 | **0.6073** |
+| **random_forest** | candidate | **0.5609 ± 0.0174** ← selected | 0.5951 |
+| gradient_boosting | candidate | 0.5379 ± 0.0308 | 0.5395 |
+
+**The drought columns disagree, and the CV column was trusted.** The single
+split puts logistic_regression 2% ahead. Per fold, random_forest against
+logistic_regression:
+
+| Fold | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| random_forest | **0.5356** | **0.5633** | **0.5662** | **0.5571** | **0.5505** | 0.5929 |
+| logistic_regression | 0.5086 | 0.5456 | 0.5552 | 0.5523 | 0.5504 | **0.6005** |
+
+Five of six, with roughly two-thirds the variance (sd 0.0174 against 0.0267).
+**Fold 5 is a margin of 0.0001 and should be read as a tie**, so the honest
+count is four clear wins, one tie, one loss — a real but not overwhelming edge.
+It is stated that way rather than as "5 of 6" because the fold table is in the
+report and a reader would find the tie anyway.
+
+Grouped CV was preferred because it is six estimates rather than one, and
+because holding out whole locations matches how the service is used — on
+coordinates absent from training. The choice was made before test, and test
+agreed: the selected model scored 0.6413 against the 0.5843 the single-split
+choice had produced.
+
+Grouped CV scores are lower than single-split ones throughout. That is expected
+and is the point: predicting an unseen location is harder than predicting an
+unseen year at a known location.
+
+`persistence` is a fixed rule with nothing to fit, but it is scored on the *same
+folds* as everything else. That matters: an earlier version of the pipeline
+compared baselines on the single split against a CV-selected model, and the
+mismatch fired a false "no learned model beat the baselines" warning on drought.
+Grouped CV is the harder estimate, so scoring the baseline on the easier one
+flattered it. Both bases are now consistent, and
+`tests/test_baseline_guard.py` locks the behaviour in.
 
 **Forest sizing.** The random forest is deliberately constrained
 (150 trees, `min_samples_leaf=200`, `max_depth=18`). An unconstrained forest
 (300 trees, leaf 20) reached depth 34–44 and 2.69 million nodes, producing a
 557 MB pair of artefacts that exceeded the 512 MB deployment tier. Constraining
-it was measured and found to *improve* validation PR-AUC — flood 0.2288 → 0.2453,
-drought 0.6129 → 0.6238 — while shrinking the models 12× to 46.2 MB. The deep
-forest was overfitting; the deployment limit and the generalisation gain pointed
-the same way.
+it was measured and found to *improve* single-split validation PR-AUC — flood
+0.2288 → 0.2453, drought 0.6129 → 0.6238 — while shrinking that pair of
+artefacts 12× to 46.2 MB.
+The deep forest was overfitting; the deployment limit and the generalisation gain
+pointed the same way. The shipped models total **30.4 MB**, smaller again because
+drought now trains on a 5-year window (§10).
 
 Gradient boosting lost on both targets, contrary to the expectation stated in
 advance. No sequence model was trained: with rolling accumulations and anomalies
@@ -241,28 +281,42 @@ from the production dependency list.
 |---|---|---|
 | n | 84,220 | 83,610 |
 | positives | 3,210 (3.81%) | 17,781 (21.27%) |
-| **PR-AUC** | **0.2441** | **0.5843** |
-| ROC-AUC | 0.8908 | 0.8458 |
-| Brier | 0.1302 | 0.1452 |
-| Precision | 0.2326 | 0.5069 |
-| Recall | 0.5458 | 0.7308 |
-| F1 | 0.3262 | 0.5986 |
-| Threshold | 0.7385 | 0.5391 |
+| **PR-AUC** | **0.2441** | **0.6413** |
+| ROC-AUC | 0.8908 | 0.8672 |
+| Brier | 0.0329 | 0.1155 |
+| Precision | 0.2719 | 0.6449 |
+| Recall | 0.4156 | 0.4888 |
+| F1 | 0.3287 | 0.5561 |
+| Threshold | 0.1137 | 0.4547 |
 | **vs base rate** | **6.4×** | **3.0×** |
 
 Confusion matrices:
 
 ```
-FLOOD     TN 75,231   FP 5,779   FN 1,458   TP 1,752
-DROUGHT   TN 53,189   FP 12,640  FN 4,787   TP 12,994
+FLOOD     TN 77,437   FP 3,573   FN 1,876   TP 1,334
+DROUGHT   TN 61,042   FP 4,787   FN 9,089   TP 8,692
 ```
+
+**The recall policy did not hold on test.** Thresholds were tuned on validation
+to reach recall ≥ 0.50 (flood) and ≥ 0.70 (drought), and on validation they did
+exactly that — 0.5033 and 0.7016. On test the same thresholds returned 0.4156
+and 0.4888. The drought shortfall is large: the model finds under half the
+drought months it was tuned to find four-fifths of.
+
+This is reported rather than repaired because repairing it means retuning the
+threshold on test, which would invalidate the test set. The cause is the
+non-stationarity of §10 — a threshold fixed on one period's score distribution
+does not carry a recall guarantee to a later period with a different base rate.
+**A recall target tuned on held-out data is an estimate, not a contract**, and a
+deployment that needs a genuine recall floor must retune on recent data and
+monitor continuously.
 
 ### Spatial generalisation
 
 | | Mean PR-AUC | SD | Degradation vs temporal |
 |---|---|---|---|
 | Flood | 0.1410 | 0.0281 | −42% |
-| Drought | 0.4983 | 0.0117 | −21% |
+| Drought | 0.4983 | 0.0117 | −22% |
 
 Both remain well above their base rates in locations never seen in training, but
 performance is **materially worse** than the temporal figures. Quoting only the
@@ -291,21 +345,37 @@ features, which describes nearly every feature here.
 
 | Rank | Feature | PR-AUC drop |
 |---|---|---|
-| 1 | `spei_lag1m` | 0.1328 |
-| 2 | `precip_30d_anomaly` | 0.1297 |
-| 3 | `soil_anomaly` | 0.0439 |
-| 4 | `water_balance_30d` | 0.0247 |
-| 5 | `water_balance_90d` | 0.0142 |
+| 1 | `spei_lag1m` | 0.1268 |
+| 2 | `precip_30d_anomaly` | 0.0982 |
+| 3 | `soil_anomaly` | 0.0338 |
+| 4 | `water_balance_30d` | 0.0231 |
+| 5 | `water_balance_90d` | 0.0184 |
 
 Anomaly features lead on both targets, which is the empirical case for the
 design argument that they carry transferability across climates.
 
-**Pruning, verified by retraining rather than inferred from the ranking.** Six
-flood features showed no contribution beyond their own shuffle noise; removing
-them gave validation PR-AUC 0.2466 against 0.2453 for the full set — no cost.
-For drought, **0 of 29** were insignificant. The full set is retained for both,
-since pruning flood buys nothing and consistency between the two models
-simplifies serving.
+**Pruning, verified by retraining rather than inferred from the ranking.**
+Six flood features and four drought features contributed no more than their own
+shuffle noise. On the single validation split, removing them appeared to *help* —
+flood 0.2466 against 0.2453, and drought 0.6249 against 0.5951, a 5% gain that
+would be worth acting on.
+
+It does not survive grouped cross-validation
+(`scripts/experiment_pruning.py`, `reports/pruning_experiment.json`):
+
+| | Full 29 | Pruned | Δ | Folds won by pruned |
+|---|---|---|---|---|
+| Flood | 0.1461 ± 0.0249 | 0.1446 ± 0.0242 (23) | −0.0015 | 1 of 6 |
+| Drought | 0.5609 ± 0.0174 | 0.5625 ± 0.0192 (25) | **+0.0016** | 3 of 6 |
+
+Drought's apparent +0.0298 is +0.0016 when whole locations are held out, and the
+pruned set wins three folds of six — a coin flip. **The full 29 features are
+retained**, and the conclusion now rests on the same evidence that decided model
+selection rather than on the single split that had already misled us once (§7).
+
+This is the second time in this project a single-split result reversed under
+grouped CV. The measurement is reported because "we used 29 features" should be
+a finding, not an assumption — and because the finding was nearly the wrong one.
 
 ---
 
@@ -328,12 +398,12 @@ probabilities.
 **Correction.** Platt (sigmoid) scaling, chosen over isotonic on a held-out half
 of validation, then fitted by 3-fold cross-validation on all pre-test data
 (`ensemble=False`, so one model plus one calibrator). Sigmoid is monotonic, so
-PR-AUC is preserved *exactly* — 0.2441 and 0.6303, unchanged.
+PR-AUC is preserved *exactly* — 0.2441 and 0.6413, unchanged.
 
 | | ECE before | After calibration | After recent-window training | Verdict |
 |---|---|---|---|---|
 | Flood | 0.2329 | **0.0113** | 0.0113 | well calibrated |
-| Drought | 0.1497 | 0.1108 | **0.0315** | well calibrated |
+| Drought | 0.1497 | 0.1108 | **0.0307** | well calibrated |
 
 Calibration alone did not fix drought — it remained at 0.111, saying 24% where
 the observed rate was 56%. Training on a recent window did (§10). **Both targets
@@ -375,36 +445,46 @@ weighting inside that window**, rather than the full 1995–2016 record. Flood
 keeps the full record — its base rate barely drifts, and a window sweep found
 every variant within noise (0.2438–0.2487 test PR-AUC).
 
-Measured honestly through the production pipeline — fit on train, select on
-validation, test touched once:
+Measured honestly through the production pipeline — fit on train, select by
+grouped cross-validation, test touched once:
 
 | Drought | Full window | Recent window |
 |---|---|---|
-| Selected model | random_forest | logistic_regression |
-| Test PR-AUC | **0.6303** | 0.5843 |
-| Test ROC-AUC | 0.8612 | 0.8458 |
-| Test ECE | 0.1108 | **0.0315** |
+| Test PR-AUC | 0.6303 | **0.6413** |
+| Test ROC-AUC | 0.8612 | **0.8672** |
+| Test ECE | 0.1108 | **0.0307** |
 
-This is a **trade-off, not a free win**: −7.3% ranking for a 3.5× calibration
-improvement. It was accepted because at ECE 0.111 the interface could not
-honestly display a drought percentage at all, whereas at 0.032 it can, and
-ranking remains strong (2.7× the base rate, well clear of the 0.4557
-persistence baseline).
+The recent window is **better on every metric** — there is no trade-off.
+
+Reaching that required fixing how candidates are selected. A first attempt chose
+logistic_regression on the recent window and scored 0.5843, which looked like a
+7.3% ranking cost for the calibration gain. The cause was the selection method,
+not the window: a single 4-year validation split put logistic_regression 2%
+ahead (0.6073 vs 0.5951), whereas 6-fold grouped cross-validation with whole
+locations held out put random_forest ahead in five of six folds with lower
+variance (0.5609 +/- 0.0174 against 0.5521 +/- 0.0267).
+
+Selection now uses grouped CV over train+validation. The single split was one
+noisy sample; holding locations out also matches how the model is used, on
+places it has never seen. The test split took no part in this decision.
 
 ### A failed experiment, recorded
 
 `scripts/experiment_rolling_window.py` swept nine training windows and reported
 that a recent window improved *both* metrics (test PR-AUC 0.6413, ECE 0.0307).
-**That result did not survive honest evaluation.** The script fits each variant
-on train+validation and then scores it on validation — rows the model has
-already seen — inflating validation PR-AUC to ~0.85 against a true ~0.60, so its
-variant selection was unsound. Its test figures are clean, but selecting by them
-is test-set selection.
+**Its selection procedure is unsound and its validation numbers must not be
+trusted.** Each variant is fitted on train+validation and then scored on
+validation — rows the model has already seen — inflating validation PR-AUC to
+~0.85 against a true ~0.60. Its test figures are clean, but choosing a variant by
+them would be test-set selection.
 
-Re-run through the production pipeline, the windowed variant selects a different
-algorithm and scores 0.5843, not 0.6413. The script is retained, annotated with
-its defect, as the record of an experiment that was wrong and how that was
-found.
+The production pipeline now reproduces those exact figures, which is a
+coincidence and not a vindication: a contaminated selection arriving at the same
+answer is luck, and an earlier production run of the same window scored 0.5843
+because it selected a different algorithm (§10 above). The conclusion is
+supported by `scripts/train.py`, which selects on grouped cross-validation and
+touches test once. The script is retained, annotated with its defect, as the
+record of a measurement that happened to be right for unsound reasons.
 
 ---
 
@@ -412,11 +492,16 @@ found.
 
 Thresholds were tuned toward recall (flood ≥ 0.50, drought ≥ 0.70) on the stated
 policy that a missed hazard costs more than a false alarm. This is a value
-judgement, not an optimum, and it is the reason precision is low:
+judgement, not an optimum, and it is the reason flood precision is low (0.27;
+drought reaches 0.64):
 
-- **Flood:** 1,458 missed events, 5,779 false alarms — **3.3 false alarms per
-  true event.**
-- **Drought:** 4,787 missed, 12,640 false alarms — 1.0 per true event.
+- **Flood:** 1,876 missed events, 3,573 false alarms — **2.7 false alarms per
+  true event**, and more events missed than caught.
+- **Drought:** 9,089 missed, 4,787 false alarms — 0.55 per true event.
+
+Note that the realised balance is not the one the policy intended: on test both
+models miss more than they were tuned to, drought especially (see §7). The
+thresholds encode the intended preference; the test period did not honour it.
 
 A deployment with different costs should retune the threshold; nothing else
 needs to change.
@@ -427,17 +512,28 @@ needs to change.
 
 ```
 python scripts/sample_locations.py       # deterministic under SAMPLE_SEED
-python scripts/download_climate_data.py  # resumable; ~26h against the free quota
-python scripts/train.py                  # ~15 min
+python scripts/download_climate_data.py  # not needed: data/raw is committed
+python scripts/train.py                  # ~20 min
 ```
 
 Environment: Python 3.14.7, scikit-learn 1.9.0, pandas 3.0.5, numpy 2.5.3.
 Exact versions in `requirements-lock.txt`. Random seed 42; sampling seed
 20260910.
 
-Raw data is not committed (657k rows) but is fully reproducible from the
-scripts. `data/processed/locations.csv` **is** committed, since it defines the
-sample.
+**All 60 raw parquet files are committed** (12 MB, 657k rows), along with
+`data/processed/locations.csv`, which defines the sample. This is deliberate:
+re-acquiring the data costs roughly 47,000 weighted Open-Meteo calls against a
+10,000/day free quota — about 4.7 days — which is also why training cannot run
+as a deployment build step, and why `models/` is committed too.
+
+**Reproducible to floating-point noise, not bit-identical.** Retraining from the
+committed data reproduces every reported metric and both decision thresholds
+exactly, but the serialised model files differ byte-for-byte between runs.
+Predictions agree to ~4×10⁻¹⁶ — double-precision epsilon. The cause is
+`n_jobs=-1`: parallel reductions sum in whatever order threads finish, and
+floating-point addition is not associative. Setting `n_jobs=1` would restore
+bit-identical artefacts at a large cost in training time. Verify a retrain by
+comparing metrics, not checksums.
 
 ---
 
@@ -453,22 +549,23 @@ sample.
    unresolvable. A consequence of the API quota limiting acquisition.
 4. **60 point locations are not a gridded product.** They characterise climate
    regimes; they do not make this spatially continuous.
-5. **Spatial degradation is significant** (−42% flood, −23% drought).
+5. **Spatial degradation is significant** (−42% flood, −22% drought).
 6. **No validation against observed flood events.** Comparing flagged days
    against the Dartmouth Flood Observatory catalogue would turn the proxy from
    an assumption into a tested claim. Not done; the clearest next step.
-7. **Calibration is untested beyond the Brier score.** Probabilities are shown
-   to users as percentages and deserve a reliability analysis.
+7. **The recall targets are not met on the test period** (§7): flood 0.42
+   against a 0.50 target, drought 0.49 against 0.70. Thresholds tuned on one
+   period do not carry a recall guarantee to another.
 8. **Latitude is a feature**, so the model can in principle key on hemisphere
    rather than physics. The spatial holdout bounds how much this matters but
    does not eliminate it.
-9. **Drought trades ranking for calibration.** Training on 2012–2016 rather than
-   1995–2016 costs 7.3% test PR-AUC and buys a 3.5× calibration improvement
-   (§10). A deployment that only ranks locations, rather than displaying
-   probabilities, should prefer the full-window model.
-10. **The recent-window drought model uses 106,753 rows**, under a quarter of the
-   record, so it is more exposed to whatever happened to occur in 2012–2016 and
-   will need periodic retraining as the base rate drifts further.
+9. **The drought model uses 106,753 rows**, under a quarter of the record, so it
+   is more exposed to whatever happened to occur in 2012–2016 and will need
+   periodic retraining as the base rate drifts further.
+10. **Model selection is sensitive to the evaluation split.** A single 4-year
+   validation split and 6-fold grouped CV disagreed on the drought algorithm,
+   and the difference on test was 9.8%. Reported results use grouped CV; a
+   reader should treat any single-split comparison in this domain with caution.
 
 ---
 

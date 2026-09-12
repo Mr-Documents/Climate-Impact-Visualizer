@@ -16,7 +16,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements-dev.txt   # Windows
 # source .venv/bin/activate && pip install -r requirements-dev.txt  # Unix
 
-pytest                          # 145 tests
+pytest                          # 152 tests
 uvicorn climate_ml.api.service:app --app-dir src --port 8000
 ```
 
@@ -44,9 +44,9 @@ ml/
 │   ├── evaluation/metrics.py PR-AUC, calibration, error costs
 │   └── api/                 FastAPI service
 ├── scripts/                 sample_locations, download, train, status
-├── tests/                   145 tests
+├── tests/                   152 tests
 ├── data/raw/                60 locations, committed (12 MB)
-├── models/                  trained artefacts, committed (46 MB)
+├── models/                  trained artefacts, committed (30 MB)
 └── reports/                 training_report.json — the record of what was measured
 ```
 
@@ -57,7 +57,9 @@ ml/
 ```bash
 python scripts/sample_locations.py       # deterministic under SAMPLE_SEED
 python scripts/download_climate_data.py  # only if data/raw is empty (~4.7 days)
-python scripts/train.py                  # ~8 minutes
+python scripts/train.py                  # ~20 minutes
+python scripts/analyse_models.py         # importance, calibration, pruning
+python scripts/experiment_pruning.py     # grouped-CV pruning check
 python scripts/status.py                 # download progress
 ```
 
@@ -68,6 +70,11 @@ and why `models/` is committed too.
 
 Determinism: sampling seed `20260910`, model seed `42`. Re-running
 `sample_locations.py` reproduces the identical 60 locations.
+
+Retraining reproduces every reported metric and both thresholds exactly, but the
+model files are **not** byte-identical between runs — `n_jobs=-1` makes parallel
+float reductions order-dependent, so predictions differ by ~4e-16. Check a
+retrain against `reports/training_report.json`, not against checksums.
 
 ---
 
@@ -127,7 +134,7 @@ to apply. Set `ML_SERVICE_URL` on the Node service to this service's address.
 | | |
 |---|---|
 | Memory | ~150–200 MB resident, fits the 512 MB free tier |
-| Models | 46 MB on disk |
+| Models | 30.4 MB on disk |
 | TensorFlow | **not installed** — no candidate justified it |
 | Workers | 1 (each loads its own copy of both models) |
 

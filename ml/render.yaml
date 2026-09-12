@@ -14,7 +14,7 @@
 # the result. The dependency list is pure-wheel, so nothing needs compiling.
 #
 # MEMORY
-# The models total 46 MB on disk and load to roughly 150-200 MB resident with
+# The models total 30.4 MB on disk and load to roughly 150-200 MB resident with
 # pandas and scikit-learn. That fits the 512 MB free tier with headroom. It only
 # fits because the random forest is depth-capped: an unconstrained forest
 # produced 557 MB of artefacts and would not have deployed at all. No TensorFlow

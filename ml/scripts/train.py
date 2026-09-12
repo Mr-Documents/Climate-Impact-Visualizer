@@ -123,11 +123,45 @@ def _fit(estimator, x: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | No
         estimator.fit(x, y)
 
 
-def _cross_validated_scores(parts, features, column, train_weight, names):
+def baselines_beating(best: dict, results: list[dict]) -> tuple[list[dict], list[str]]:
+    """Baselines that outscore the selected model, on the SAME basis as selection.
+
+    Selection uses grouped CV, so this comparison must too. An earlier version
+    compared baselines on single-split validation PR-AUC against a CV-selected
+    candidate, which fired a false negative result on drought: logistic_regression
+    leads on the single split (0.6073 vs 0.5951) but trails on grouped CV
+    (0.5521 vs 0.5609). Reporting a model as having failed its baselines, using a
+    metric that took no part in choosing it, is a reporting bug - and an academic
+    honesty problem in both directions.
+
+    Returns the beating baselines and the names of any that could not be
+    compared, so an unchecked baseline is visible rather than read as a pass.
+    """
+    baselines = [r for r in results
+                 if r.get("notes", {}).get("tier") == "baseline" or r["name"] == "persistence"]
+    comparable = [r for r in baselines if np.isfinite(r.get("cv_pr_auc", float("nan")))]
+    missing = [r["name"] for r in baselines if r not in comparable]
+    reference = best.get("cv_pr_auc", float("nan"))
+    if not np.isfinite(reference):
+        # Never silently pass: without a CV score for the selected model there
+        # is nothing to compare, and every baseline is unchecked.
+        return [], [r["name"] for r in baselines]
+    return [r for r in comparable if r["cv_pr_auc"] > reference], missing
+
+
+def _cross_validated_scores(parts, features, column, train_weight, names, target_name):
     """Grouped CV over train+validation, holding whole locations out.
 
     More robust than a single split, and it measures the thing that actually
     matters: performance in places the model has not seen.
+
+    The persistence baseline is scored on the SAME folds. It needs no fitting -
+    it is a function of existing columns - but it has to be measured on the same
+    basis as everything else, because the "did a learned model actually beat the
+    naive answer?" check compares against it. Scoring the candidates by grouped
+    CV and the baseline by a single validation split compares two different
+    quantities: grouped CV is the harder estimate, so that mismatch makes the
+    baseline look better than it is and fires a false negative result.
     """
     frames = [parts[SPLIT_TRAIN], parts[SPLIT_VALIDATION]]
     combined = pd.concat(frames, ignore_index=True)
@@ -140,10 +174,28 @@ def _cross_validated_scores(parts, features, column, train_weight, names):
         weight = np.concatenate([train_weight, np.ones(len(parts[SPLIT_VALIDATION]))])
 
     folds = min(config.SPATIAL_FOLDS, len(np.unique(groups)))
+    splits = list(GroupKFold(n_splits=folds).split(x, y, groups))
     scores: dict[str, dict] = {}
+
+    persistence_folds = []
+    for _, test_idx in splits:
+        if y[test_idx].sum() == 0:
+            continue
+        held_out = _persistence_scores(target_name, combined.iloc[test_idx])
+        if held_out is None:
+            persistence_folds = []
+            break
+        persistence_folds.append(average_precision_score(y[test_idx], held_out))
+    if persistence_folds:
+        scores["persistence"] = {
+            "mean": float(np.mean(persistence_folds)),
+            "sd": float(np.std(persistence_folds)),
+            "folds": [round(float(v), 4) for v in persistence_folds],
+        }
+
     for name in names:
         fold_scores = []
-        for train_idx, test_idx in GroupKFold(n_splits=folds).split(x, y, groups):
+        for train_idx, test_idx in splits:
             if y[train_idx].sum() == 0 or y[test_idx].sum() == 0:
                 continue
             estimator = next(c for c in build_candidates() if c.name == name).estimator
@@ -155,6 +207,10 @@ def _cross_validated_scores(parts, features, column, train_weight, names):
         scores[name] = {
             "mean": float(np.mean(fold_scores)) if fold_scores else float("nan"),
             "sd": float(np.std(fold_scores)) if fold_scores else float("nan"),
+            # Per-fold scores are kept, not just their summary: "it won 5 of 6
+            # folds" is a claim the report should be able to substantiate, and
+            # a mean can hide one fold carrying the whole margin.
+            "folds": [round(float(v), 4) for v in fold_scores],
         }
     return scores
 
@@ -310,18 +366,22 @@ def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dic
     # A single 4-year split is a noisy estimator. On the drought target it ranked
     # logistic_regression above random_forest by 2% (0.6073 vs 0.5951), yet
     # random_forest generalised far better - and 6-fold grouped CV showed it
-    # winning 5 of 6 folds with half the variance (0.5637 +/- 0.0178 against
-    # 0.5521 +/- 0.0267). Holding whole locations out also matches how the model
-    # is actually used: on places it has never seen.
+    # ahead in 5 of 6 folds with about two-thirds the variance (0.5609 +/- 0.0174
+    # against 0.5521 +/- 0.0267). One of those five is a 0.0001 margin, so read
+    # it as four clear wins, one tie, one loss. Holding whole locations out also
+    # matches how the model is actually used: on places it has never seen.
     #
     # The test split takes no part in this and is still touched exactly once.
     trainable = [r for r in results if r["name"] in fitted]
     cv_scores = _cross_validated_scores(
-        parts, features, column, train_weight, [r["name"] for r in trainable]
+        parts, features, column, train_weight, [r["name"] for r in trainable], target_name
     )
-    for row in trainable:
+    for row in results:
+        if row["name"] not in cv_scores:
+            continue
         row["cv_pr_auc"] = cv_scores[row["name"]]["mean"]
         row["cv_pr_auc_sd"] = cv_scores[row["name"]]["sd"]
+        row["cv_pr_auc_folds"] = cv_scores[row["name"]]["folds"]
         logger.info("  %-22s grouped-CV PR-AUC %.4f +/- %.4f",
                     row["name"], row["cv_pr_auc"], row["cv_pr_auc_sd"])
 
@@ -332,19 +392,33 @@ def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dic
     # A learned model that cannot beat a naive baseline has not earned its place.
     # Say so loudly rather than quietly shipping it - this is the check that was
     # missing when the drought model lost to persistence and was selected anyway.
-    baselines = [r for r in results if r["notes"].get("tier") == "baseline"
-                 or r["name"] == "persistence"]
-    beaten_by = [r for r in baselines
-                 if np.isfinite(r["pr_auc"]) and r["pr_auc"] > best["pr_auc"]]
+    #
+    # Compared on grouped CV, the same basis selection uses. An earlier version
+    # compared baselines on single-split validation against a CV-selected
+    # candidate and fired a false alarm on drought: logistic_regression leads on
+    # the single split (0.6073 vs 0.5951) but trails on CV (0.5521 vs 0.5609).
+    # Declaring a negative result from a metric that did not make the decision
+    # would have misreported a model that does clear its baselines.
+    beaten_by, missing_cv = baselines_beating(best, results)
+    if missing_cv:
+        # Not silently ignored: a baseline with no CV score is not checked, and
+        # that has to be visible rather than read as a pass.
+        logger.warning("%s: baseline(s) %s have no grouped-CV score and were NOT "
+                       "compared against the selected model.",
+                       target_name, ", ".join(missing_cv))
+
     if beaten_by:
-        strongest = max(beaten_by, key=lambda r: r["pr_auc"])
+        strongest = max(beaten_by, key=lambda r: r["cv_pr_auc"])
         logger.warning(
-            "%s: NO LEARNED MODEL BEAT THE BASELINES. '%s' scores %.4f on validation "
-            "versus %.4f for the best candidate '%s'. The model is still saved for "
-            "inspection, but this must be reported as a negative result.",
-            target_name, strongest["name"], strongest["pr_auc"],
-            best["pr_auc"], best["name"],
+            "%s: NO LEARNED MODEL BEAT THE BASELINES. '%s' scores %.4f grouped-CV "
+            "PR-AUC versus %.4f for the best candidate '%s'. The model is still "
+            "saved for inspection, but this must be reported as a negative result.",
+            target_name, strongest["name"], strongest["cv_pr_auc"],
+            best["cv_pr_auc"], best["name"],
         )
+    else:
+        logger.info("%s: selected model clears every baseline on grouped CV "
+                    "(%.4f)", target_name, best["cv_pr_auc"])
 
     # Choosing the calibration method needs a model that has not seen the
     # validation rows, so fit one on TRAIN only purely for that decision.

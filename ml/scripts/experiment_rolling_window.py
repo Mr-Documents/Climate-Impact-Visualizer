@@ -32,13 +32,16 @@ version of this script did and which this version was supposed to fix. It did
 not fix it; it moved the contamination rather than removing it.
 
 The sound way to run this comparison is the production pipeline itself
-(scripts/train.py), which fits on train, selects on validation, and touches
-test once. That was done, and it contradicted this script: the windowed drought
-variant selects a different algorithm and scores test PR-AUC 0.5843, not the
-0.6413 reported below.
+(scripts/train.py), which fits on train, selects candidates by grouped
+cross-validation, and touches test once. That was done. It now reproduces the
+0.6413 reported below - but treat that as a coincidence, not a vindication. An
+earlier production run of the same window scored 0.5843 because single-split
+selection picked a different algorithm; the agreement appeared only once
+selection was fixed, and a contaminated procedure landing on the right answer is
+luck.
 
-This file is retained as the record of an experiment whose result did not
-survive honest evaluation. Its conclusions should be read only alongside
+This file is retained as the record of a measurement that was right for unsound
+reasons. Its conclusions should be read only alongside
 reports/training_report.json. To repair it, hold out a third split for variant
 selection, or fit each variant on train alone before scoring validation.
 """

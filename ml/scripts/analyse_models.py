@@ -59,6 +59,10 @@ def verify_pruning(target: str, column: str, table: pd.DataFrame,
     An importance ranking suggests what might be removable; only retraining
     shows whether it is. Correlated features can each look individually
     dispensable while collectively carrying real signal.
+
+    Measured on the single validation split, which is indicative only - see the
+    note at the call site. scripts/experiment_pruning.py is the grouped-CV
+    version whose result the model card actually cites.
     """
     if not dropped:
         return {"attempted": False, "reason": "no features were candidates for pruning"}
@@ -143,14 +147,25 @@ def main() -> int:
             delta = pruning["pruned_val_pr_auc"] - baseline_val
             pruning["full_val_pr_auc"] = round(baseline_val, 4)
             pruning["delta"] = round(delta, 4)
+            # SINGLE-SPLIT EVIDENCE ONLY. This is one validation split, which on
+            # this data has twice pointed the wrong way (model selection, then
+            # this measurement: drought showed +0.0298 here and +0.0016 under
+            # grouped CV). The verdict says what was measured and on what basis;
+            # it does not recommend acting. scripts/experiment_pruning.py runs
+            # the grouped-CV version that decides.
+            pruning["basis"] = "single validation split - not a selection basis"
             pruning["verdict"] = (
-                "pruning is safe - no measurable cost"
-                if delta >= -0.005
-                else "pruning costs accuracy - keep the full feature set"
+                f"single-split delta {delta:+.4f}; confirm with "
+                "scripts/experiment_pruning.py before acting"
             )
             logger.info("pruned to %d features: val PR-AUC %.4f vs %.4f full (%+.4f) - %s",
                         pruning["features_kept"], pruning["pruned_val_pr_auc"],
                         baseline_val, delta, pruning["verdict"])
+            if delta > 0.005:
+                logger.warning(
+                    "%s: pruning looks like a gain on ONE split. Do not act on this "
+                    "without scripts/experiment_pruning.py - the grouped-CV run "
+                    "reduced an apparent +0.0298 to +0.0016.", target)
 
         summary["targets"][target] = {
             "threshold": threshold,

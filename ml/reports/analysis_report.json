@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-12T16:02:01.912794+00:00",
+  "generated_at": "2026-09-12T19:33:13.901424+00:00",
   "n_features": 29,
   "targets": {
     "flood": {
@@ -262,46 +262,82 @@
       }
     },
     "drought": {
-      "threshold": 0.20125802564880554,
+      "threshold": 0.45473742640446113,
       "calibration": {
-        "expected_calibration_error": 0.1108,
-        "max_calibration_error": 0.5462,
-        "verdict": "poorly calibrated - recalibrate before presenting as probabilities",
+        "expected_calibration_error": 0.0307,
+        "max_calibration_error": 0.1937,
+        "verdict": "well calibrated - probabilities can be shown to users as stated",
         "bins": [
           {
             "bin_lower": 0.0,
             "bin_upper": 0.1,
-            "count": 45178,
-            "mean_predicted": 0.0624,
-            "observed_frequency": 0.0445,
-            "gap": 0.0179,
+            "count": 40395,
+            "mean_predicted": 0.052,
+            "observed_frequency": 0.0295,
+            "gap": 0.0225,
             "direction": "over-confident"
           },
           {
             "bin_lower": 0.1,
             "bin_upper": 0.2,
-            "count": 22711,
-            "mean_predicted": 0.1464,
-            "observed_frequency": 0.2787,
-            "gap": 0.1323,
+            "count": 12640,
+            "mean_predicted": 0.1438,
+            "observed_frequency": 0.171,
+            "gap": 0.0273,
             "direction": "under-confident"
           },
           {
             "bin_lower": 0.2,
             "bin_upper": 0.3,
-            "count": 13482,
-            "mean_predicted": 0.2436,
-            "observed_frequency": 0.5573,
-            "gap": 0.3137,
+            "count": 7769,
+            "mean_predicted": 0.2465,
+            "observed_frequency": 0.2994,
+            "gap": 0.0529,
             "direction": "under-confident"
           },
           {
             "bin_lower": 0.3,
             "bin_upper": 0.4,
-            "count": 2239,
-            "mean_predicted": 0.3149,
-            "observed_frequency": 0.8611,
-            "gap": 0.5462,
+            "count": 6213,
+            "mean_predicted": 0.3495,
+            "observed_frequency": 0.3383,
+            "gap": 0.0111,
+            "direction": "over-confident"
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.5,
+            "count": 5589,
+            "mean_predicted": 0.4496,
+            "observed_frequency": 0.4464,
+            "gap": 0.0032,
+            "direction": "over-confident"
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.6,
+            "count": 5418,
+            "mean_predicted": 0.5497,
+            "observed_frequency": 0.581,
+            "gap": 0.0314,
+            "direction": "under-confident"
+          },
+          {
+            "bin_lower": 0.6,
+            "bin_upper": 0.7,
+            "count": 4341,
+            "mean_predicted": 0.6456,
+            "observed_frequency": 0.7395,
+            "gap": 0.0939,
+            "direction": "under-confident"
+          },
+          {
+            "bin_lower": 0.7,
+            "bin_upper": 0.8,
+            "count": 1245,
+            "mean_predicted": 0.726,
+            "observed_frequency": 0.9197,
+            "gap": 0.1937,
             "direction": "under-confident"
           }
         ]
@@ -310,210 +346,221 @@
         {
           "rank": 1,
           "feature": "spei_lag1m",
-          "pr_auc_drop": 0.13277,
-          "std": 0.00186,
+          "pr_auc_drop": 0.1268,
+          "std": 0.00209,
           "significant": true
         },
         {
           "rank": 2,
           "feature": "precip_30d_anomaly",
-          "pr_auc_drop": 0.12969,
-          "std": 0.0029,
+          "pr_auc_drop": 0.09818,
+          "std": 0.00294,
           "significant": true
         },
         {
           "rank": 3,
           "feature": "soil_anomaly",
-          "pr_auc_drop": 0.04388,
-          "std": 0.00151,
+          "pr_auc_drop": 0.03381,
+          "std": 0.00156,
           "significant": true
         },
         {
           "rank": 4,
           "feature": "water_balance_30d",
-          "pr_auc_drop": 0.0247,
-          "std": 0.00156,
+          "pr_auc_drop": 0.02314,
+          "std": 0.00142,
           "significant": true
         },
         {
           "rank": 5,
           "feature": "water_balance_90d",
-          "pr_auc_drop": 0.01424,
-          "std": 0.00165,
+          "pr_auc_drop": 0.01839,
+          "std": 0.002,
           "significant": true
         },
         {
           "rank": 6,
-          "feature": "precip_30d",
-          "pr_auc_drop": 0.01134,
-          "std": 0.0011,
+          "feature": "et0_30d",
+          "pr_auc_drop": 0.00989,
+          "std": 0.00073,
           "significant": true
         },
         {
           "rank": 7,
-          "feature": "precip_max_1d_in_30d",
-          "pr_auc_drop": 0.01085,
-          "std": 0.00095,
+          "feature": "doy_cos",
+          "pr_auc_drop": 0.00947,
+          "std": 0.00083,
           "significant": true
         },
         {
           "rank": 8,
-          "feature": "et0_30d",
-          "pr_auc_drop": 0.01074,
-          "std": 0.00026,
+          "feature": "precip_30d",
+          "pr_auc_drop": 0.00884,
+          "std": 0.00144,
           "significant": true
         },
         {
           "rank": 9,
-          "feature": "soil_change_30d",
-          "pr_auc_drop": 0.00934,
-          "std": 0.00053,
+          "feature": "latitude",
+          "pr_auc_drop": 0.00795,
+          "std": 0.00054,
           "significant": true
         },
         {
           "rank": 10,
-          "feature": "temp_anomaly",
-          "pr_auc_drop": 0.00586,
-          "std": 0.00029,
+          "feature": "elevation_m",
+          "pr_auc_drop": 0.00719,
+          "std": 0.00018,
           "significant": true
         },
         {
           "rank": 11,
-          "feature": "elevation_m",
-          "pr_auc_drop": 0.00537,
-          "std": 0.00021,
+          "feature": "precip_180d",
+          "pr_auc_drop": 0.00683,
+          "std": 0.00065,
           "significant": true
         },
         {
           "rank": 12,
-          "feature": "antecedent_precip_index",
-          "pr_auc_drop": 0.0053,
-          "std": 0.00064,
+          "feature": "soil_mean_30d",
+          "pr_auc_drop": 0.00646,
+          "std": 0.00068,
           "significant": true
         },
         {
           "rank": 13,
-          "feature": "precip_90d",
-          "pr_auc_drop": 0.00484,
-          "std": 0.00024,
+          "feature": "precip_max_1d_in_30d",
+          "pr_auc_drop": 0.0063,
+          "std": 0.00081,
           "significant": true
         },
         {
           "rank": 14,
-          "feature": "soil",
-          "pr_auc_drop": 0.00465,
-          "std": 0.00034,
+          "feature": "doy_sin",
+          "pr_auc_drop": 0.00617,
+          "std": 0.00074,
           "significant": true
         },
         {
           "rank": 15,
-          "feature": "latitude",
-          "pr_auc_drop": 0.00402,
-          "std": 0.00028,
+          "feature": "antecedent_precip_index",
+          "pr_auc_drop": 0.00584,
+          "std": 0.00091,
           "significant": true
         },
         {
           "rank": 16,
-          "feature": "doy_sin",
-          "pr_auc_drop": 0.00393,
-          "std": 0.00018,
+          "feature": "water_balance_180d",
+          "pr_auc_drop": 0.0049,
+          "std": 0.00038,
           "significant": true
         },
         {
           "rank": 17,
-          "feature": "precip_180d",
-          "pr_auc_drop": 0.00357,
-          "std": 0.00018,
-          "significant": true
-        },
-        {
-          "rank": 18,
-          "feature": "temperature",
-          "pr_auc_drop": 0.00354,
-          "std": 0.00034,
-          "significant": true
-        },
-        {
-          "rank": 19,
-          "feature": "consecutive_dry_days",
-          "pr_auc_drop": 0.00334,
-          "std": 0.00026,
-          "significant": true
-        },
-        {
-          "rank": 20,
-          "feature": "water_balance_180d",
-          "pr_auc_drop": 0.0033,
-          "std": 0.00046,
-          "significant": true
-        },
-        {
-          "rank": 21,
-          "feature": "soil_mean_30d",
-          "pr_auc_drop": 0.00288,
+          "feature": "soil",
+          "pr_auc_drop": 0.00484,
           "std": 0.00045,
           "significant": true
         },
         {
-          "rank": 22,
+          "rank": 18,
+          "feature": "temp_anomaly",
+          "pr_auc_drop": 0.0043,
+          "std": 0.00014,
+          "significant": true
+        },
+        {
+          "rank": 19,
           "feature": "wet_days_in_30d",
-          "pr_auc_drop": 0.00257,
+          "pr_auc_drop": 0.00394,
+          "std": 0.0004,
+          "significant": true
+        },
+        {
+          "rank": 20,
+          "feature": "soil_change_30d",
+          "pr_auc_drop": 0.00334,
+          "std": 0.00037,
+          "significant": true
+        },
+        {
+          "rank": 21,
+          "feature": "precip_90d",
+          "pr_auc_drop": 0.00314,
+          "std": 0.00049,
+          "significant": true
+        },
+        {
+          "rank": 22,
+          "feature": "temperature",
+          "pr_auc_drop": 0.00276,
           "std": 0.00031,
           "significant": true
         },
         {
           "rank": 23,
-          "feature": "doy_cos",
-          "pr_auc_drop": 0.00229,
+          "feature": "consecutive_dry_days",
+          "pr_auc_drop": 0.00129,
           "std": 0.00031,
           "significant": true
         },
         {
           "rank": 24,
-          "feature": "precip_7d",
-          "pr_auc_drop": 0.0015,
-          "std": 0.00039,
-          "significant": true
+          "feature": "precip_max_1d_in_7d",
+          "pr_auc_drop": 0.00039,
+          "std": 0.00053,
+          "significant": false
         },
         {
           "rank": 25,
-          "feature": "precip_max_1d_in_7d",
-          "pr_auc_drop": 0.00093,
-          "std": 0.00034,
+          "feature": "soil_change_7d",
+          "pr_auc_drop": 0.00033,
+          "std": 4e-05,
           "significant": true
         },
         {
           "rank": 26,
-          "feature": "soil_change_7d",
-          "pr_auc_drop": 0.00071,
-          "std": 0.0001,
+          "feature": "precip_3d",
+          "pr_auc_drop": 0.00029,
+          "std": 9e-05,
           "significant": true
         },
         {
           "rank": 27,
-          "feature": "precip_3d",
-          "pr_auc_drop": 0.00029,
-          "std": 0.00012,
-          "significant": true
+          "feature": "precip_7d",
+          "pr_auc_drop": 0.00023,
+          "std": 0.00026,
+          "significant": false
         },
         {
           "rank": 28,
           "feature": "precip_1d",
-          "pr_auc_drop": 0.00018,
+          "pr_auc_drop": 3e-05,
           "std": 6e-05,
-          "significant": true
+          "significant": false
         },
         {
           "rank": 29,
           "feature": "consecutive_wet_days",
-          "pr_auc_drop": 9e-05,
-          "std": 4e-05,
-          "significant": true
+          "pr_auc_drop": 2e-05,
+          "std": 5e-05,
+          "significant": false
         }
       ],
       "pruning": {
-        "attempted": false,
-        "reason": "no features were candidates for pruning"
+        "attempted": true,
+        "features_kept": 25,
+        "features_dropped": 4,
+        "dropped": [
+          "precip_max_1d_in_7d",
+          "precip_7d",
+          "precip_1d",
+          "consecutive_wet_days"
+        ],
+        "pruned_val_pr_auc": 0.6249,
+        "full_val_pr_auc": 0.5951,
+        "delta": 0.0298,
+        "verdict": "pruning is safe - no measurable cost"
       }
     }
   }
