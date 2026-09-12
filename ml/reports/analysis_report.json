@@ -1,0 +1,520 @@
+{
+  "generated_at": "2026-09-12T16:02:01.912794+00:00",
+  "n_features": 29,
+  "targets": {
+    "flood": {
+      "threshold": 0.11370581342268157,
+      "calibration": {
+        "expected_calibration_error": 0.0113,
+        "max_calibration_error": 0.1144,
+        "verdict": "well calibrated - probabilities can be shown to users as stated",
+        "bins": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.1,
+            "count": 77828,
+            "mean_predicted": 0.0177,
+            "observed_frequency": 0.0208,
+            "gap": 0.0031,
+            "direction": "under-confident"
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.2,
+            "count": 6345,
+            "mean_predicted": 0.1368,
+            "observed_frequency": 0.2479,
+            "gap": 0.1111,
+            "direction": "under-confident"
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.3,
+            "count": 47,
+            "mean_predicted": 0.2048,
+            "observed_frequency": 0.3191,
+            "gap": 0.1144,
+            "direction": "under-confident"
+          }
+        ]
+      },
+      "feature_importance": [
+        {
+          "rank": 1,
+          "feature": "soil_anomaly",
+          "pr_auc_drop": 0.04922,
+          "std": 0.0081,
+          "significant": true
+        },
+        {
+          "rank": 2,
+          "feature": "antecedent_precip_index",
+          "pr_auc_drop": 0.03283,
+          "std": 0.00334,
+          "significant": true
+        },
+        {
+          "rank": 3,
+          "feature": "precip_3d",
+          "pr_auc_drop": 0.02625,
+          "std": 0.00295,
+          "significant": true
+        },
+        {
+          "rank": 4,
+          "feature": "precip_1d",
+          "pr_auc_drop": 0.02144,
+          "std": 0.00461,
+          "significant": true
+        },
+        {
+          "rank": 5,
+          "feature": "consecutive_wet_days",
+          "pr_auc_drop": 0.01916,
+          "std": 0.0035,
+          "significant": true
+        },
+        {
+          "rank": 6,
+          "feature": "consecutive_dry_days",
+          "pr_auc_drop": 0.01527,
+          "std": 0.00342,
+          "significant": true
+        },
+        {
+          "rank": 7,
+          "feature": "precip_7d",
+          "pr_auc_drop": 0.01526,
+          "std": 0.00257,
+          "significant": true
+        },
+        {
+          "rank": 8,
+          "feature": "precip_max_1d_in_7d",
+          "pr_auc_drop": 0.00899,
+          "std": 0.00294,
+          "significant": true
+        },
+        {
+          "rank": 9,
+          "feature": "temperature",
+          "pr_auc_drop": 0.00897,
+          "std": 0.00201,
+          "significant": true
+        },
+        {
+          "rank": 10,
+          "feature": "precip_30d",
+          "pr_auc_drop": 0.0062,
+          "std": 0.00222,
+          "significant": true
+        },
+        {
+          "rank": 11,
+          "feature": "soil",
+          "pr_auc_drop": 0.006,
+          "std": 0.00024,
+          "significant": true
+        },
+        {
+          "rank": 12,
+          "feature": "wet_days_in_30d",
+          "pr_auc_drop": 0.00535,
+          "std": 0.0009,
+          "significant": true
+        },
+        {
+          "rank": 13,
+          "feature": "elevation_m",
+          "pr_auc_drop": 0.00496,
+          "std": 0.00056,
+          "significant": true
+        },
+        {
+          "rank": 14,
+          "feature": "spei_lag1m",
+          "pr_auc_drop": 0.00472,
+          "std": 0.0007,
+          "significant": true
+        },
+        {
+          "rank": 15,
+          "feature": "latitude",
+          "pr_auc_drop": 0.00449,
+          "std": 0.00195,
+          "significant": true
+        },
+        {
+          "rank": 16,
+          "feature": "soil_mean_30d",
+          "pr_auc_drop": 0.00359,
+          "std": 0.00057,
+          "significant": true
+        },
+        {
+          "rank": 17,
+          "feature": "doy_cos",
+          "pr_auc_drop": 0.00235,
+          "std": 0.00041,
+          "significant": true
+        },
+        {
+          "rank": 18,
+          "feature": "precip_30d_anomaly",
+          "pr_auc_drop": 0.00204,
+          "std": 0.00049,
+          "significant": true
+        },
+        {
+          "rank": 19,
+          "feature": "precip_180d",
+          "pr_auc_drop": 0.00186,
+          "std": 0.0008,
+          "significant": true
+        },
+        {
+          "rank": 20,
+          "feature": "water_balance_30d",
+          "pr_auc_drop": 0.00167,
+          "std": 0.00031,
+          "significant": true
+        },
+        {
+          "rank": 21,
+          "feature": "water_balance_180d",
+          "pr_auc_drop": 0.00128,
+          "std": 0.00052,
+          "significant": true
+        },
+        {
+          "rank": 22,
+          "feature": "et0_30d",
+          "pr_auc_drop": 0.00124,
+          "std": 0.00037,
+          "significant": true
+        },
+        {
+          "rank": 23,
+          "feature": "precip_90d",
+          "pr_auc_drop": 0.00118,
+          "std": 0.00135,
+          "significant": false
+        },
+        {
+          "rank": 24,
+          "feature": "soil_change_30d",
+          "pr_auc_drop": 0.0007,
+          "std": 0.00129,
+          "significant": false
+        },
+        {
+          "rank": 25,
+          "feature": "doy_sin",
+          "pr_auc_drop": 0.00068,
+          "std": 0.00032,
+          "significant": true
+        },
+        {
+          "rank": 26,
+          "feature": "precip_max_1d_in_30d",
+          "pr_auc_drop": 0.00063,
+          "std": 0.00204,
+          "significant": false
+        },
+        {
+          "rank": 27,
+          "feature": "temp_anomaly",
+          "pr_auc_drop": 0.00041,
+          "std": 0.00034,
+          "significant": false
+        },
+        {
+          "rank": 28,
+          "feature": "water_balance_90d",
+          "pr_auc_drop": 0.00021,
+          "std": 0.00033,
+          "significant": false
+        },
+        {
+          "rank": 29,
+          "feature": "soil_change_7d",
+          "pr_auc_drop": 0.00016,
+          "std": 0.00087,
+          "significant": false
+        }
+      ],
+      "pruning": {
+        "attempted": true,
+        "features_kept": 23,
+        "features_dropped": 6,
+        "dropped": [
+          "precip_90d",
+          "soil_change_30d",
+          "precip_max_1d_in_30d",
+          "temp_anomaly",
+          "water_balance_90d",
+          "soil_change_7d"
+        ],
+        "pruned_val_pr_auc": 0.2466,
+        "full_val_pr_auc": 0.2453,
+        "delta": 0.0013,
+        "verdict": "pruning is safe - no measurable cost"
+      }
+    },
+    "drought": {
+      "threshold": 0.20125802564880554,
+      "calibration": {
+        "expected_calibration_error": 0.1108,
+        "max_calibration_error": 0.5462,
+        "verdict": "poorly calibrated - recalibrate before presenting as probabilities",
+        "bins": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.1,
+            "count": 45178,
+            "mean_predicted": 0.0624,
+            "observed_frequency": 0.0445,
+            "gap": 0.0179,
+            "direction": "over-confident"
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.2,
+            "count": 22711,
+            "mean_predicted": 0.1464,
+            "observed_frequency": 0.2787,
+            "gap": 0.1323,
+            "direction": "under-confident"
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.3,
+            "count": 13482,
+            "mean_predicted": 0.2436,
+            "observed_frequency": 0.5573,
+            "gap": 0.3137,
+            "direction": "under-confident"
+          },
+          {
+            "bin_lower": 0.3,
+            "bin_upper": 0.4,
+            "count": 2239,
+            "mean_predicted": 0.3149,
+            "observed_frequency": 0.8611,
+            "gap": 0.5462,
+            "direction": "under-confident"
+          }
+        ]
+      },
+      "feature_importance": [
+        {
+          "rank": 1,
+          "feature": "spei_lag1m",
+          "pr_auc_drop": 0.13277,
+          "std": 0.00186,
+          "significant": true
+        },
+        {
+          "rank": 2,
+          "feature": "precip_30d_anomaly",
+          "pr_auc_drop": 0.12969,
+          "std": 0.0029,
+          "significant": true
+        },
+        {
+          "rank": 3,
+          "feature": "soil_anomaly",
+          "pr_auc_drop": 0.04388,
+          "std": 0.00151,
+          "significant": true
+        },
+        {
+          "rank": 4,
+          "feature": "water_balance_30d",
+          "pr_auc_drop": 0.0247,
+          "std": 0.00156,
+          "significant": true
+        },
+        {
+          "rank": 5,
+          "feature": "water_balance_90d",
+          "pr_auc_drop": 0.01424,
+          "std": 0.00165,
+          "significant": true
+        },
+        {
+          "rank": 6,
+          "feature": "precip_30d",
+          "pr_auc_drop": 0.01134,
+          "std": 0.0011,
+          "significant": true
+        },
+        {
+          "rank": 7,
+          "feature": "precip_max_1d_in_30d",
+          "pr_auc_drop": 0.01085,
+          "std": 0.00095,
+          "significant": true
+        },
+        {
+          "rank": 8,
+          "feature": "et0_30d",
+          "pr_auc_drop": 0.01074,
+          "std": 0.00026,
+          "significant": true
+        },
+        {
+          "rank": 9,
+          "feature": "soil_change_30d",
+          "pr_auc_drop": 0.00934,
+          "std": 0.00053,
+          "significant": true
+        },
+        {
+          "rank": 10,
+          "feature": "temp_anomaly",
+          "pr_auc_drop": 0.00586,
+          "std": 0.00029,
+          "significant": true
+        },
+        {
+          "rank": 11,
+          "feature": "elevation_m",
+          "pr_auc_drop": 0.00537,
+          "std": 0.00021,
+          "significant": true
+        },
+        {
+          "rank": 12,
+          "feature": "antecedent_precip_index",
+          "pr_auc_drop": 0.0053,
+          "std": 0.00064,
+          "significant": true
+        },
+        {
+          "rank": 13,
+          "feature": "precip_90d",
+          "pr_auc_drop": 0.00484,
+          "std": 0.00024,
+          "significant": true
+        },
+        {
+          "rank": 14,
+          "feature": "soil",
+          "pr_auc_drop": 0.00465,
+          "std": 0.00034,
+          "significant": true
+        },
+        {
+          "rank": 15,
+          "feature": "latitude",
+          "pr_auc_drop": 0.00402,
+          "std": 0.00028,
+          "significant": true
+        },
+        {
+          "rank": 16,
+          "feature": "doy_sin",
+          "pr_auc_drop": 0.00393,
+          "std": 0.00018,
+          "significant": true
+        },
+        {
+          "rank": 17,
+          "feature": "precip_180d",
+          "pr_auc_drop": 0.00357,
+          "std": 0.00018,
+          "significant": true
+        },
+        {
+          "rank": 18,
+          "feature": "temperature",
+          "pr_auc_drop": 0.00354,
+          "std": 0.00034,
+          "significant": true
+        },
+        {
+          "rank": 19,
+          "feature": "consecutive_dry_days",
+          "pr_auc_drop": 0.00334,
+          "std": 0.00026,
+          "significant": true
+        },
+        {
+          "rank": 20,
+          "feature": "water_balance_180d",
+          "pr_auc_drop": 0.0033,
+          "std": 0.00046,
+          "significant": true
+        },
+        {
+          "rank": 21,
+          "feature": "soil_mean_30d",
+          "pr_auc_drop": 0.00288,
+          "std": 0.00045,
+          "significant": true
+        },
+        {
+          "rank": 22,
+          "feature": "wet_days_in_30d",
+          "pr_auc_drop": 0.00257,
+          "std": 0.00031,
+          "significant": true
+        },
+        {
+          "rank": 23,
+          "feature": "doy_cos",
+          "pr_auc_drop": 0.00229,
+          "std": 0.00031,
+          "significant": true
+        },
+        {
+          "rank": 24,
+          "feature": "precip_7d",
+          "pr_auc_drop": 0.0015,
+          "std": 0.00039,
+          "significant": true
+        },
+        {
+          "rank": 25,
+          "feature": "precip_max_1d_in_7d",
+          "pr_auc_drop": 0.00093,
+          "std": 0.00034,
+          "significant": true
+        },
+        {
+          "rank": 26,
+          "feature": "soil_change_7d",
+          "pr_auc_drop": 0.00071,
+          "std": 0.0001,
+          "significant": true
+        },
+        {
+          "rank": 27,
+          "feature": "precip_3d",
+          "pr_auc_drop": 0.00029,
+          "std": 0.00012,
+          "significant": true
+        },
+        {
+          "rank": 28,
+          "feature": "precip_1d",
+          "pr_auc_drop": 0.00018,
+          "std": 6e-05,
+          "significant": true
+        },
+        {
+          "rank": 29,
+          "feature": "consecutive_wet_days",
+          "pr_auc_drop": 9e-05,
+          "std": 4e-05,
+          "significant": true
+        }
+      ],
+      "pruning": {
+        "attempted": false,
+        "reason": "no features were candidates for pruning"
+      }
+    }
+  }
+}

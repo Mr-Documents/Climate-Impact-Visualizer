@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-12T14:52:16.219261+00:00",
+  "generated_at": "2026-09-12T15:45:54.999099+00:00",
   "n_locations": 60,
   "n_rows": 657480,
   "date_range": [
@@ -78,7 +78,7 @@
             "notes": {
               "tier": "baseline",
               "rationale": "Always predicts the training positive rate. The floor.",
-              "fit_seconds": 0.05
+              "fit_seconds": 0.08
             }
           },
           {
@@ -102,7 +102,7 @@
             "notes": {
               "tier": "baseline",
               "rationale": "Linear reference. Extra complexity must beat this to be justified.",
-              "fit_seconds": 9.8
+              "fit_seconds": 10.02
             }
           },
           {
@@ -126,7 +126,7 @@
             "notes": {
               "tier": "candidate",
               "rationale": "Robust to scaling, captures interactions. Depth-capped: measured more accurate AND ~13x smaller than an unconstrained forest.",
-              "fit_seconds": 57.68
+              "fit_seconds": 59.49
             }
           },
           {
@@ -150,7 +150,7 @@
             "notes": {
               "tier": "candidate",
               "rationale": "Expected strongest on engineered tabular features; handles NaN natively.",
-              "fit_seconds": 20.69
+              "fit_seconds": 22.1
             }
           }
         ],
@@ -162,99 +162,70 @@
           "n": 84220,
           "positives": 3210,
           "positive_rate": 0.03811446212301116,
-          "pr_auc": 0.24406740639637411,
+          "pr_auc": 0.24406740639637414,
           "roc_auc": 0.8908226840961523,
-          "brier": 0.13016491363796548,
-          "threshold": 0.7385393605905307,
-          "precision": 0.23263842783162927,
-          "recall": 0.5457943925233645,
-          "f1": 0.32622660832324735,
-          "true_negative": 75231,
-          "false_positive": 5779,
-          "false_negative": 1458,
-          "true_positive": 1752,
+          "brier": 0.032873028937984446,
+          "threshold": 0.11370581342268157,
+          "precision": 0.27185653148563277,
+          "recall": 0.41557632398753896,
+          "f1": 0.32869286682271776,
+          "true_negative": 77437,
+          "false_positive": 3573,
+          "false_negative": 1876,
+          "true_positive": 1334,
           "pr_auc_skill_vs_base_rate": 0.21411377566599962,
           "notes": {
-            "threshold_source": "tuned on validation, applied unchanged",
-            "min_recall_policy": 0.5
+            "threshold_source": "tuned on calibrated validation scores",
+            "min_recall_policy": 0.5,
+            "calibration": {
+              "method": "sigmoid",
+              "selected_on": "held-out half of validation",
+              "held_out_ece": 0.003,
+              "held_out_max_gap": 0.0569,
+              "pr_auc_cost": 0.0,
+              "alternatives": {
+                "sigmoid": {
+                  "ece": 0.003,
+                  "max_gap": 0.0569,
+                  "pr_auc_cost": 0.0
+                },
+                "isotonic": {
+                  "ece": 0.0011,
+                  "max_gap": 0.2857,
+                  "pr_auc_cost": 0.00987
+                }
+              },
+              "final_fit": "cross-validated on train+validation (cv=3, ensemble=False)"
+            }
           }
         },
         "test_error_costs": {
-          "missed_events": 1458,
-          "false_alarms": 5779,
-          "missed_event_rate": 0.4542056074766355,
-          "false_alarms_per_true_event": 3.29851598173516
+          "missed_events": 1876,
+          "false_alarms": 3573,
+          "missed_event_rate": 0.584423676012461,
+          "false_alarms_per_true_event": 2.6784107946026987
         },
         "test_calibration": [
           {
             "bin_lower": 0.0,
             "bin_upper": 0.1,
-            "count": 32452,
-            "mean_predicted": 0.03623764668406254,
-            "observed_frequency": 0.0013250338962159497
+            "count": 77828,
+            "mean_predicted": 0.017691476650787265,
+            "observed_frequency": 0.020840828493601273
           },
           {
             "bin_lower": 0.1,
             "bin_upper": 0.2,
-            "count": 13274,
-            "mean_predicted": 0.1460983861803494,
-            "observed_frequency": 0.006026819346090101
+            "count": 6345,
+            "mean_predicted": 0.13684597098172868,
+            "observed_frequency": 0.2479117415287628
           },
           {
             "bin_lower": 0.2,
             "bin_upper": 0.30000000000000004,
-            "count": 8725,
-            "mean_predicted": 0.24638536696463628,
-            "observed_frequency": 0.012836676217765044
-          },
-          {
-            "bin_lower": 0.30000000000000004,
-            "bin_upper": 0.4,
-            "count": 6016,
-            "mean_predicted": 0.34697918476705314,
-            "observed_frequency": 0.020279255319148936
-          },
-          {
-            "bin_lower": 0.4,
-            "bin_upper": 0.5,
-            "count": 4882,
-            "mean_predicted": 0.4487786755228083,
-            "observed_frequency": 0.03318312167144613
-          },
-          {
-            "bin_lower": 0.5,
-            "bin_upper": 0.6000000000000001,
-            "count": 4628,
-            "mean_predicted": 0.5496682902894665,
-            "observed_frequency": 0.05942091616248919
-          },
-          {
-            "bin_lower": 0.6000000000000001,
-            "bin_upper": 0.7000000000000001,
-            "count": 4868,
-            "mean_predicted": 0.6502758010902917,
-            "observed_frequency": 0.088126540673788
-          },
-          {
-            "bin_lower": 0.7000000000000001,
-            "bin_upper": 0.8,
-            "count": 4569,
-            "mean_predicted": 0.7488340062206783,
-            "observed_frequency": 0.14664040271394177
-          },
-          {
-            "bin_lower": 0.8,
-            "bin_upper": 0.9,
-            "count": 3780,
-            "mean_predicted": 0.8481060581089046,
-            "observed_frequency": 0.24735449735449735
-          },
-          {
-            "bin_lower": 0.9,
-            "bin_upper": 1.0,
-            "count": 1026,
-            "mean_predicted": 0.920912420448679,
-            "observed_frequency": 0.3723196881091618
+            "count": 47,
+            "mean_predicted": 0.20478676275453778,
+            "observed_frequency": 0.3191489361702128
           }
         ],
         "beaten_by_baseline": [],
@@ -289,7 +260,27 @@
           "temperature",
           "spei_lag1m"
         ],
-        "threshold": 0.7385393605905307
+        "threshold": 0.11370581342268157,
+        "calibration": {
+          "method": "sigmoid",
+          "selected_on": "held-out half of validation",
+          "held_out_ece": 0.003,
+          "held_out_max_gap": 0.0569,
+          "pr_auc_cost": 0.0,
+          "alternatives": {
+            "sigmoid": {
+              "ece": 0.003,
+              "max_gap": 0.0569,
+              "pr_auc_cost": 0.0
+            },
+            "isotonic": {
+              "ece": 0.0011,
+              "max_gap": 0.2857,
+              "pr_auc_cost": 0.00987
+            }
+          },
+          "final_fit": "cross-validated on train+validation (cv=3, ensemble=False)"
+        }
       },
       "spatial_holdout": {
         "skipped": false,
@@ -568,7 +559,7 @@
             "notes": {
               "tier": "baseline",
               "rationale": "Linear reference. Extra complexity must beat this to be justified.",
-              "fit_seconds": 7.65
+              "fit_seconds": 8.03
             }
           },
           {
@@ -592,7 +583,7 @@
             "notes": {
               "tier": "candidate",
               "rationale": "Robust to scaling, captures interactions. Depth-capped: measured more accurate AND ~13x smaller than an unconstrained forest.",
-              "fit_seconds": 54.76
+              "fit_seconds": 56.63
             }
           },
           {
@@ -616,7 +607,7 @@
             "notes": {
               "tier": "candidate",
               "rationale": "Expected strongest on engineered tabular features; handles NaN natively.",
-              "fit_seconds": 20.09
+              "fit_seconds": 21.33
             }
           }
         ],
@@ -630,97 +621,75 @@
           "positive_rate": 0.2126659490491568,
           "pr_auc": 0.6303458659961862,
           "roc_auc": 0.8612128545503253,
-          "brier": 0.14515430174999014,
-          "threshold": 0.5391382915479153,
-          "precision": 0.5069048919403917,
-          "recall": 0.7307800461166414,
-          "f1": 0.598594955660486,
-          "true_negative": 53189,
-          "false_positive": 12640,
-          "false_negative": 4787,
-          "true_positive": 12994,
+          "brier": 0.14680323938534154,
+          "threshold": 0.20125802564880554,
+          "precision": 0.6040589451913133,
+          "recall": 0.5256172318767224,
+          "f1": 0.5621146964183683,
+          "true_negative": 59703,
+          "false_positive": 6126,
+          "false_negative": 8435,
+          "true_positive": 9346,
           "pr_auc_skill_vs_base_rate": 0.530498987618544,
           "notes": {
-            "threshold_source": "tuned on validation, applied unchanged",
-            "min_recall_policy": 0.7
+            "threshold_source": "tuned on calibrated validation scores",
+            "min_recall_policy": 0.7,
+            "calibration": {
+              "method": "sigmoid",
+              "selected_on": "held-out half of validation",
+              "held_out_ece": 0.0131,
+              "held_out_max_gap": 0.0414,
+              "pr_auc_cost": 0.0,
+              "alternatives": {
+                "sigmoid": {
+                  "ece": 0.0131,
+                  "max_gap": 0.0414,
+                  "pr_auc_cost": 0.0
+                },
+                "isotonic": {
+                  "ece": 0.0029,
+                  "max_gap": 0.0295,
+                  "pr_auc_cost": 0.00747
+                }
+              },
+              "final_fit": "cross-validated on train+validation (cv=3, ensemble=False)"
+            }
           }
         },
         "test_error_costs": {
-          "missed_events": 4787,
-          "false_alarms": 12640,
-          "missed_event_rate": 0.2692199538833586,
-          "false_alarms_per_true_event": 0.9727566569185778
+          "missed_events": 8435,
+          "false_alarms": 6126,
+          "missed_event_rate": 0.4743827681232777,
+          "false_alarms_per_true_event": 0.6554675797132463
         },
         "test_calibration": [
           {
             "bin_lower": 0.0,
             "bin_upper": 0.1,
-            "count": 21535,
-            "mean_predicted": 0.049356224317123575,
-            "observed_frequency": 0.008358486185279778
+            "count": 45178,
+            "mean_predicted": 0.062362417175718096,
+            "observed_frequency": 0.04449068130505999
           },
           {
             "bin_lower": 0.1,
             "bin_upper": 0.2,
-            "count": 11635,
-            "mean_predicted": 0.14562113423348508,
-            "observed_frequency": 0.03472281908036098
+            "count": 22711,
+            "mean_predicted": 0.1463581923277511,
+            "observed_frequency": 0.2786755316806834
           },
           {
             "bin_lower": 0.2,
             "bin_upper": 0.30000000000000004,
-            "count": 8225,
-            "mean_predicted": 0.24870993500216806,
-            "observed_frequency": 0.10249240121580547
+            "count": 13482,
+            "mean_predicted": 0.2436485078184192,
+            "observed_frequency": 0.5573357068684172
           },
           {
             "bin_lower": 0.30000000000000004,
             "bin_upper": 0.4,
-            "count": 7280,
-            "mean_predicted": 0.3494106764507157,
-            "observed_frequency": 0.16483516483516483
-          },
-          {
-            "bin_lower": 0.4,
-            "bin_upper": 0.5,
-            "count": 6625,
-            "mean_predicted": 0.45119174545322627,
-            "observed_frequency": 0.21932075471698112
-          },
-          {
-            "bin_lower": 0.5,
-            "bin_upper": 0.6000000000000001,
-            "count": 6762,
-            "mean_predicted": 0.5502316632536354,
-            "observed_frequency": 0.29488317065956815
-          },
-          {
-            "bin_lower": 0.6000000000000001,
-            "bin_upper": 0.7000000000000001,
-            "count": 7570,
-            "mean_predicted": 0.6492390875468886,
-            "observed_frequency": 0.4060766182298547
-          },
-          {
-            "bin_lower": 0.7000000000000001,
-            "bin_upper": 0.8,
-            "count": 6750,
-            "mean_predicted": 0.7492799913697507,
-            "observed_frequency": 0.4837037037037037
-          },
-          {
-            "bin_lower": 0.8,
-            "bin_upper": 0.9,
-            "count": 5326,
-            "mean_predicted": 0.8460073121761871,
-            "observed_frequency": 0.6948929778445362
-          },
-          {
-            "bin_lower": 0.9,
-            "bin_upper": 1.0,
-            "count": 1902,
-            "mean_predicted": 0.9252484569688576,
-            "observed_frequency": 0.8764458464773922
+            "count": 2239,
+            "mean_predicted": 0.31493144190770295,
+            "observed_frequency": 0.8610987047789191
           }
         ],
         "beaten_by_baseline": [],
@@ -755,7 +724,27 @@
           "temperature",
           "spei_lag1m"
         ],
-        "threshold": 0.5391382915479153
+        "threshold": 0.20125802564880554,
+        "calibration": {
+          "method": "sigmoid",
+          "selected_on": "held-out half of validation",
+          "held_out_ece": 0.0131,
+          "held_out_max_gap": 0.0414,
+          "pr_auc_cost": 0.0,
+          "alternatives": {
+            "sigmoid": {
+              "ece": 0.0131,
+              "max_gap": 0.0414,
+              "pr_auc_cost": 0.0
+            },
+            "isotonic": {
+              "ece": 0.0029,
+              "max_gap": 0.0295,
+              "pr_auc_cost": 0.00747
+            }
+          },
+          "final_fit": "cross-validated on train+validation (cv=3, ensemble=False)"
+        }
       },
       "spatial_holdout": {
         "skipped": false,

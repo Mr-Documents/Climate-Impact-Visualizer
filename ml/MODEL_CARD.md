@@ -270,7 +270,116 @@ temporal numbers as evidence of global generalisation would be misleading.
 
 ---
 
-## 8. Error trade-off
+## 8. Feature importance
+
+Permutation importance on the **held-out test set**: the drop in PR-AUC when a
+feature's column is shuffled. Impurity-based importance is not used — it is
+computed on training data and biased toward high-cardinality continuous
+features, which describes nearly every feature here.
+
+**Flood** (top 5 of 29)
+
+| Rank | Feature | PR-AUC drop |
+|---|---|---|
+| 1 | `soil_anomaly` | 0.0492 |
+| 2 | `antecedent_precip_index` | 0.0328 |
+| 3 | `precip_3d` | 0.0263 |
+| 4 | `precip_1d` | 0.0214 |
+| 5 | `consecutive_wet_days` | 0.0192 |
+
+**Drought** (top 5 of 29)
+
+| Rank | Feature | PR-AUC drop |
+|---|---|---|
+| 1 | `spei_lag1m` | 0.1328 |
+| 2 | `precip_30d_anomaly` | 0.1297 |
+| 3 | `soil_anomaly` | 0.0439 |
+| 4 | `water_balance_30d` | 0.0247 |
+| 5 | `water_balance_90d` | 0.0142 |
+
+Anomaly features lead on both targets, which is the empirical case for the
+design argument that they carry transferability across climates.
+
+**Pruning, verified by retraining rather than inferred from the ranking.** Six
+flood features showed no contribution beyond their own shuffle noise; removing
+them gave validation PR-AUC 0.2466 against 0.2453 for the full set — no cost.
+For drought, **0 of 29** were insignificant. The full set is retained for both,
+since pruning flood buys nothing and consistency between the two models
+simplifies serving.
+
+---
+
+## 9. Probability calibration
+
+The dashboard presents these numbers to users as percentages, so they have to
+mean what they say.
+
+**Uncalibrated, the models were badly over-confident in every bin:**
+
+| | Model said | Actual rate |
+|---|---|---|
+| Flood | 75% | 15% |
+| Drought | 75% | 48% |
+
+Expected calibration error 0.233 (flood) and 0.150 (drought). The cause is
+`class_weight="balanced"`, which improves ranking but inflates minority-class
+probabilities.
+
+**Correction.** Platt (sigmoid) scaling, chosen over isotonic on a held-out half
+of validation, then fitted by 3-fold cross-validation on all pre-test data
+(`ensemble=False`, so one model plus one calibrator). Sigmoid is monotonic, so
+PR-AUC is preserved *exactly* — 0.2441 and 0.6303, unchanged.
+
+| | ECE before | ECE after (test) | Verdict |
+|---|---|---|---|
+| Flood | 0.2329 | **0.0113** | well calibrated |
+| Drought | 0.1497 | **0.1108** | **still poorly calibrated** |
+
+**Flood probabilities can be shown to users as stated. Drought probabilities
+cannot**, and now err in the opposite direction — the model says 24% where the
+observed rate is 56%. It *understates* drought risk. Section 10 explains why.
+
+Two implementation errors were made and caught by measurement, both worth
+recording: selecting the calibration method on the same rows it was fitted to
+(isotonic scores a meaningless ECE 0.0000 there), and fitting the final model on
+train only, which cost 8% test PR-AUC purely by discarding four years of data.
+
+---
+
+## 10. Drought is non-stationary — and that is a finding, not a bug
+
+SPEI is standardised on the 1995–2016 training period. Later years are scored
+against that same fitted distribution, so the drought rate should stay near the
+15.87% implied by a −1σ threshold. It does not:
+
+| Period | Drought rate | vs stationary expectation |
+|---|---|---|
+| 1995–2016 (train) | 13.78% | 0.87× |
+| 2017–2020 (validation) | 23.28% | **1.47×** |
+| 2021–2024 (test) | 21.20% | **1.34×** |
+
+Drought is **34–47% more frequent** in 2017–2024 than the 1995–2016 baseline
+implies. This is the signal SPEI was designed to detect, recovered here from 60
+globally distributed locations.
+
+It also explains the calibration failure directly: a model trained on a period
+with 13.78% drought cannot produce calibrated probabilities for a period with
+21.20%, because the class prior it learned no longer holds. **No post-hoc
+calibration can fix a shifting base rate** — the correction is fitted on one
+prior and applied under another.
+
+Practical consequences:
+
+- Drought *ranking* remains sound (PR-AUC 0.6303, ROC-AUC 0.8612): the model
+  still orders days correctly by risk.
+- Drought *probabilities* systematically understate risk and should be presented
+  as bands rather than percentages.
+- Retraining on a rolling recent window, rather than a fixed historical block,
+  is the obvious mitigation and is left as future work.
+
+---
+
+## 11. Error trade-off
 
 Thresholds were tuned toward recall (flood ≥ 0.50, drought ≥ 0.70) on the stated
 policy that a missed hazard costs more than a false alarm. This is a value
@@ -285,7 +394,7 @@ needs to change.
 
 ---
 
-## 9. Reproducibility
+## 12. Reproducibility
 
 ```
 python scripts/sample_locations.py       # deterministic under SAMPLE_SEED
@@ -303,7 +412,7 @@ sample.
 
 ---
 
-## 10. Known limitations
+## 13. Known limitations
 
 1. **Reanalysis is modelled, not measured.** ERA5 assimilates observations into
    a physics model on a ~25 km grid and smooths convective rainfall peaks, so
@@ -324,10 +433,13 @@ sample.
 8. **Latitude is a feature**, so the model can in principle key on hemisphere
    rather than physics. The spatial holdout bounds how much this matters but
    does not eliminate it.
+9. **Drought probabilities are not calibrated** (ECE 0.111) because the drought
+   base rate is non-stationary across the record (§10). Present drought as a
+   band, not a percentage. Flood probabilities are calibrated (ECE 0.011).
 
 ---
 
-## 11. References
+## 14. References
 
 - Vicente-Serrano, Beguería & López-Moreno (2010). *A Multiscalar Drought Index
   Sensitive to Global Warming: SPEI.* J. Climate 23, 1696–1718.

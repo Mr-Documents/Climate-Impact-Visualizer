@@ -630,8 +630,8 @@ const Dashboard = () => {
       label: "Flood Risk Level",
       value: humanizeRisk(floodRisk),
       icon: <FaWater size={22} className="text-primary" />,
-      // State the probability and which engine produced it. "AI prediction" on
-      // its own told the user nothing about provenance or confidence.
+      // The flood model is calibrated (expected calibration error 0.011), so
+      // its probability is meaningful and shown as a percentage.
       caption: riskSource === "model"
         ? `${(floodScore * 100).toFixed(0)}% probability - trained model`
         : (riskSource === "rule" ? "Rule-based fallback" : "AI prediction"),
@@ -640,8 +640,13 @@ const Dashboard = () => {
       label: "Drought Severity",
       value: humanizeRisk(droughtRisk),
       icon: <FaCloudSun size={22} className="text-warning" />,
+      // The drought model ranks well but its probabilities are NOT calibrated
+      // (ECE 0.111): drought frequency rose ~35% between the training period
+      // and now, so a probability learned on the old base rate understates
+      // present risk. Showing "24%" when the observed rate is 56% would
+      // mislead, so the band is shown without a number.
       caption: riskSource === "model"
-        ? `${(droughtScore * 100).toFixed(0)}% probability - trained model`
+        ? "Trained model - relative severity"
         : (riskSource === "rule" ? "Rule-based fallback" : "AI prediction"),
     },
     {
