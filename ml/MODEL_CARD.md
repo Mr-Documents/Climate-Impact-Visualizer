@@ -241,8 +241,8 @@ from the production dependency list.
 |---|---|---|
 | n | 84,220 | 83,610 |
 | positives | 3,210 (3.81%) | 17,781 (21.27%) |
-| **PR-AUC** | **0.2441** | **0.6303** |
-| ROC-AUC | 0.8908 | 0.8612 |
+| **PR-AUC** | **0.2441** | **0.5843** |
+| ROC-AUC | 0.8908 | 0.8458 |
 | Brier | 0.1302 | 0.1452 |
 | Precision | 0.2326 | 0.5069 |
 | Recall | 0.5458 | 0.7308 |
@@ -330,14 +330,14 @@ of validation, then fitted by 3-fold cross-validation on all pre-test data
 (`ensemble=False`, so one model plus one calibrator). Sigmoid is monotonic, so
 PR-AUC is preserved *exactly* — 0.2441 and 0.6303, unchanged.
 
-| | ECE before | ECE after (test) | Verdict |
-|---|---|---|---|
-| Flood | 0.2329 | **0.0113** | well calibrated |
-| Drought | 0.1497 | **0.1108** | **still poorly calibrated** |
+| | ECE before | After calibration | After recent-window training | Verdict |
+|---|---|---|---|---|
+| Flood | 0.2329 | **0.0113** | 0.0113 | well calibrated |
+| Drought | 0.1497 | 0.1108 | **0.0315** | well calibrated |
 
-**Flood probabilities can be shown to users as stated. Drought probabilities
-cannot**, and now err in the opposite direction — the model says 24% where the
-observed rate is 56%. It *understates* drought risk. Section 10 explains why.
+Calibration alone did not fix drought — it remained at 0.111, saying 24% where
+the observed rate was 56%. Training on a recent window did (§10). **Both targets
+now produce probabilities that can be shown to users as stated.**
 
 Two implementation errors were made and caught by measurement, both worth
 recording: selecting the calibration method on the same rows it was fitted to
@@ -368,14 +368,43 @@ with 13.78% drought cannot produce calibrated probabilities for a period with
 calibration can fix a shifting base rate** — the correction is fitted on one
 prior and applied under another.
 
-Practical consequences:
+### Mitigation: train drought on a recent window
 
-- Drought *ranking* remains sound (PR-AUC 0.6303, ROC-AUC 0.8612): the model
-  still orders days correctly by risk.
-- Drought *probabilities* systematically understate risk and should be presented
-  as bands rather than percentages.
-- Retraining on a rolling recent window, rather than a fixed historical block,
-  is the obvious mitigation and is left as future work.
+Drought now trains on **2012–2016 only (106,753 rows), with 3-year recency
+weighting inside that window**, rather than the full 1995–2016 record. Flood
+keeps the full record — its base rate barely drifts, and a window sweep found
+every variant within noise (0.2438–0.2487 test PR-AUC).
+
+Measured honestly through the production pipeline — fit on train, select on
+validation, test touched once:
+
+| Drought | Full window | Recent window |
+|---|---|---|
+| Selected model | random_forest | logistic_regression |
+| Test PR-AUC | **0.6303** | 0.5843 |
+| Test ROC-AUC | 0.8612 | 0.8458 |
+| Test ECE | 0.1108 | **0.0315** |
+
+This is a **trade-off, not a free win**: −7.3% ranking for a 3.5× calibration
+improvement. It was accepted because at ECE 0.111 the interface could not
+honestly display a drought percentage at all, whereas at 0.032 it can, and
+ranking remains strong (2.7× the base rate, well clear of the 0.4557
+persistence baseline).
+
+### A failed experiment, recorded
+
+`scripts/experiment_rolling_window.py` swept nine training windows and reported
+that a recent window improved *both* metrics (test PR-AUC 0.6413, ECE 0.0307).
+**That result did not survive honest evaluation.** The script fits each variant
+on train+validation and then scores it on validation — rows the model has
+already seen — inflating validation PR-AUC to ~0.85 against a true ~0.60, so its
+variant selection was unsound. Its test figures are clean, but selecting by them
+is test-set selection.
+
+Re-run through the production pipeline, the windowed variant selects a different
+algorithm and scores 0.5843, not 0.6413. The script is retained, annotated with
+its defect, as the record of an experiment that was wrong and how that was
+found.
 
 ---
 
@@ -433,9 +462,13 @@ sample.
 8. **Latitude is a feature**, so the model can in principle key on hemisphere
    rather than physics. The spatial holdout bounds how much this matters but
    does not eliminate it.
-9. **Drought probabilities are not calibrated** (ECE 0.111) because the drought
-   base rate is non-stationary across the record (§10). Present drought as a
-   band, not a percentage. Flood probabilities are calibrated (ECE 0.011).
+9. **Drought trades ranking for calibration.** Training on 2012–2016 rather than
+   1995–2016 costs 7.3% test PR-AUC and buys a 3.5× calibration improvement
+   (§10). A deployment that only ranks locations, rather than displaying
+   probabilities, should prefer the full-window model.
+10. **The recent-window drought model uses 106,753 rows**, under a quarter of the
+   record, so it is more exposed to whatever happened to occur in 2012–2016 and
+   will need periodic retraining as the base rate drifts further.
 
 ---
 

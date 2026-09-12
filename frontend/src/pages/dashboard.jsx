@@ -640,13 +640,11 @@ const Dashboard = () => {
       label: "Drought Severity",
       value: humanizeRisk(droughtRisk),
       icon: <FaCloudSun size={22} className="text-warning" />,
-      // The drought model ranks well but its probabilities are NOT calibrated
-      // (ECE 0.111): drought frequency rose ~35% between the training period
-      // and now, so a probability learned on the old base rate understates
-      // present risk. Showing "24%" when the observed rate is 56% would
-      // mislead, so the band is shown without a number.
+      // Drought probabilities became trustworthy once the model was trained on
+      // a recent window (test ECE 0.111 -> 0.032). Before that the number was
+      // withheld, because the model said 24% where the observed rate was 56%.
       caption: riskSource === "model"
-        ? "Trained model - relative severity"
+        ? `${(droughtScore * 100).toFixed(0)}% probability - trained model`
         : (riskSource === "rule" ? "Rule-based fallback" : "AI prediction"),
     },
     {

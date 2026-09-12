@@ -18,12 +18,29 @@ variant, so the LABELS are identical throughout. Only the rows the model learns
 from change. Without that control a shorter window would also redefine the
 target and no difference would be interpretable.
 
-SELECTION
-Variants are chosen on VALIDATION only. An earlier version of this experiment
-compared them on the test set and picked the winner from it - with nine
-variants, the best test score is partly luck and the reported figure would be
-optimistic. Test numbers are computed and reported, but never consulted to
-choose.
+KNOWN DEFECT IN THIS SCRIPT - READ BEFORE TRUSTING ITS VALIDATION NUMBERS
+-------------------------------------------------------------------------
+The validation metrics reported here are CONTAMINATED and must not be used for
+selection. Each variant is fitted with CalibratedClassifierCV over
+train+validation (mirroring production), then scored on validation - rows the
+model has already trained on. That inflates validation PR-AUC to ~0.85 where
+the honest figure is ~0.60.
+
+The TEST metrics are clean, because the test split never enters training. But
+choosing a variant by them is test-set selection, which is what an earlier
+version of this script did and which this version was supposed to fix. It did
+not fix it; it moved the contamination rather than removing it.
+
+The sound way to run this comparison is the production pipeline itself
+(scripts/train.py), which fits on train, selects on validation, and touches
+test once. That was done, and it contradicted this script: the windowed drought
+variant selects a different algorithm and scores test PR-AUC 0.5843, not the
+0.6413 reported below.
+
+This file is retained as the record of an experiment whose result did not
+survive honest evaluation. Its conclusions should be read only alongside
+reports/training_report.json. To repair it, hold out a third split for variant
+selection, or fit each variant on train alone before scoring validation.
 """
 
 from __future__ import annotations
@@ -118,6 +135,7 @@ def run_variant(
     val_scores = model.predict_proba(x_val)[:, 1]
     threshold = choose_threshold(y_val, val_scores, min_recall=min_recall)
 
+    # CONTAMINATED: the model trained on these rows. See the module docstring.
     val_report = evaluate(name, SPLIT_VALIDATION, y_val, val_scores, threshold)
     val_calibration = assess_calibration(y_val, val_scores)
 
@@ -136,8 +154,8 @@ def run_variant(
         "variant": name,
         "train_rows": len(y_train),
         "train_positive_rate": round(float(y_train.mean()), 4),
-        "val_pr_auc": round(val_report.pr_auc, 4),
-        "val_ece": val_calibration.expected_calibration_error,
+        "val_pr_auc_CONTAMINATED": round(val_report.pr_auc, 4),
+        "val_ece_CONTAMINATED": val_calibration.expected_calibration_error,
         "test_pr_auc": round(test_report.pr_auc, 4),
         "test_roc_auc": round(test_report.roc_auc, 4),
         "test_ece": test_calibration.expected_calibration_error,
@@ -178,15 +196,15 @@ def run_target(target: str, column: str, min_recall: float, table: pd.DataFrame)
 
     acceptable = [
         r for r in results
-        if r["val_pr_auc"] >= baseline["val_pr_auc"] - MAX_VAL_PR_AUC_LOSS
+        if r["val_pr_auc_CONTAMINATED"] >= baseline["val_pr_auc_CONTAMINATED"] - MAX_VAL_PR_AUC_LOSS
     ]
     if not acceptable:
         acceptable = results
         logger.warning("%s: every variant lost ranking; choosing on calibration alone", target)
-    chosen = min(acceptable, key=lambda r: r["val_ece"])
+    chosen = min(acceptable, key=lambda r: r["val_ece_CONTAMINATED"])
 
     logger.info("  -> chosen on validation: %s (val ECE %.4f, val PR-AUC %.4f)",
-                chosen["variant"], chosen["val_ece"], chosen["val_pr_auc"])
+                chosen["variant"], chosen["val_ece_CONTAMINATED"], chosen["val_pr_auc_CONTAMINATED"])
     logger.info("     its test performance: PR-AUC %.4f  ECE %.4f  (%s)",
                 chosen["test_pr_auc"], chosen["test_ece"], chosen["calibration_verdict"][:30])
 
@@ -195,7 +213,7 @@ def run_target(target: str, column: str, min_recall: float, table: pd.DataFrame)
         "chosen": chosen["variant"],
         "chosen_first_year": next(v[1] for v in VARIANTS if v[0] == chosen["variant"]),
         "chosen_half_life": next(v[2] for v in VARIANTS if v[0] == chosen["variant"]),
-        "chosen_val_ece": chosen["val_ece"],
+        "chosen_val_ece_CONTAMINATED": chosen["val_ece_CONTAMINATED"],
         "chosen_test_pr_auc": chosen["test_pr_auc"],
         "chosen_test_ece": chosen["test_ece"],
         "baseline_test_pr_auc": baseline["test_pr_auc"],
@@ -216,7 +234,7 @@ def main() -> int:
     summary = {
         "generated_at": pd.Timestamp.now("UTC").isoformat(),
         "control": "SPEI and R95p fitted on 1995-2016 in every variant; labels identical",
-        "selection_basis": "validation only; test computed but never used to choose",
+        "selection_basis": "UNSOUND - validation metrics are contaminated; see module docstring",
         "targets": per_target,
     }
 
