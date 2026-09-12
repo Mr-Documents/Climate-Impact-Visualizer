@@ -13,15 +13,16 @@ DROUGHT PERSISTENCE - READ THIS BEFORE INTERPRETING ANY DROUGHT METRIC
 ----------------------------------------------------------------------
 SPEI-3 for month M accumulates the water balance over months M-2, M-1 and M. If
 we predict the SPEI of the month roughly 30 days after day ``t``, part of that
-window has already been observed by day ``t``. This is NOT a leak - the target
-month's own balance is still unknown - but it does mean a large share of the
-target is determined by antecedent conditions.
+window has already been observed by ``t``. The target month's own balance is
+still unknown, so this is not a leak - but a large share of the target is
+determined by antecedent conditions.
 
-That persistence is precisely why drought is forecastable at all, and it is also
-why a naive "current SPEI continues" baseline is strong. Any claim that the
-model has learned something must therefore be made against that baseline, not
-against a random-guess floor. ``spei_persistence_baseline`` is emitted here for
-exactly that comparison.
+That persistence is precisely why drought is forecastable at all, and it makes
+"the last observed drought state continues" a strong baseline. Any claim that
+the model learned something must be made against that baseline, not against a
+random-guess floor. ``spei_persistence_baseline`` is emitted for that comparison
+and ``spei_lag1m`` - the same signal - is offered to the model as a feature, so
+it can improve on persistence rather than having to rediscover it.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ import pandas as pd
 from climate_ml import config
 from climate_ml.features.build import build_features, feature_columns, fit_climatology
 from climate_ml.labels.drought import compute_spei, label_drought, water_balance_monthly
-from climate_ml.labels.flood import fit_thresholds, label_flood
+from climate_ml.labels.flood import fit_thresholds, flood_generating_days, label_flood
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +55,23 @@ def assign_split(years: np.ndarray) -> np.ndarray:
 
 
 def _drought_targets(frame: pd.DataFrame, train_mask: np.ndarray) -> pd.DataFrame:
-    """Daily drought label plus the persistence baseline it must be judged against.
+    """Daily drought label, plus the causal drought state it is judged against.
 
-    SPEI is a monthly index, so it is computed monthly and then joined back onto
-    daily rows: the label at day ``t`` is the SPEI of the month containing
+    SPEI is monthly, so it is computed monthly and joined back onto daily rows:
+    the label at day ``t`` is the SPEI of the month containing
     ``t + DROUGHT_HORIZON_DAYS``.
+
+    CAUSALITY - the subtle bug this fixes
+    -------------------------------------
+    An earlier version exposed ``spei_now``: the SPEI of the month *containing*
+    ``t``. That month is not finished on day ``t``, so its value depends on days
+    ``t+1`` onward - future information. It was used both as a diagnostic and as
+    the persistence baseline, which made that baseline look far stronger than it
+    is (test PR-AUC 0.65) and set an unfairly high bar for the model.
+
+    ``spei_lag1m`` is the SPEI of the last COMPLETE month before ``t``. It is
+    fully observed by ``t``, so it is legitimate both as a model feature and as
+    the persistence baseline. That is the honest comparison.
     """
     monthly = water_balance_monthly(frame)
     if monthly.empty:
@@ -74,15 +87,22 @@ def _drought_targets(frame: pd.DataFrame, train_mask: np.ndarray) -> pd.DataFram
     current_month = dates.dt.to_period("M")
     target_month = (dates + pd.Timedelta(days=config.DROUGHT_HORIZON_DAYS)).dt.to_period("M")
 
-    spei_now = current_month.map(lookup).astype(float)
+    # Last COMPLETE month before t - the most recent SPEI actually knowable on
+    # day t. Anything from the current month would leak.
+    previous_month = current_month - 1
+
+    spei_lag1m = previous_month.map(lookup).astype(float)
     spei_future = target_month.map(lookup).astype(float)
 
     out = pd.DataFrame(index=frame.index)
-    out["spei_now"] = spei_now.to_numpy()
+    # Permitted as a model FEATURE: it is causal, and withholding it forces the
+    # model to rediscover current drought state from raw rainfall, which is the
+    # baseline's whole advantage.
+    out["spei_lag1m"] = spei_lag1m.to_numpy()
     out["y_drought"] = label_drought(spei_future, config.DROUGHT_THRESHOLD).to_numpy()
-    # Baseline: assume today's drought state simply persists.
+    # Baseline: assume the last observed drought state simply persists.
     out["spei_persistence_baseline"] = label_drought(
-        spei_now, config.DROUGHT_THRESHOLD
+        spei_lag1m, config.DROUGHT_THRESHOLD
     ).to_numpy()
     # Guard against the join silently succeeding past the end of the record.
     beyond_record = target_month > month_periods.max()
@@ -106,6 +126,19 @@ def assemble_location(frame: pd.DataFrame) -> pd.DataFrame:
     flood_thresholds = fit_thresholds(frame, train_mask, config.FLOOD_PERCENTILE)
     features["y_flood"] = label_flood(frame, flood_thresholds, config.FLOOD_HORIZON_DAYS)
     features["r95p_mm"] = flood_thresholds.r95p_mm
+
+    # Persistence analogue for flood: did a flood-generating day occur in the
+    # PRECEDING window of the same length as the forecast horizon? Reusing the
+    # drought SPEI signal here was meaningless - it scored ROC-AUC 0.32, worse
+    # than random, because a drought index says nothing about flooding.
+    generating = flood_generating_days(frame, flood_thresholds)
+    recent = (
+        pd.Series(generating)
+        .rolling(config.FLOOD_HORIZON_DAYS, min_periods=1)
+        .max()
+        .to_numpy()
+    )
+    features["flood_recent_activity"] = recent
 
     drought = _drought_targets(frame, train_mask)
     for column in drought.columns:
@@ -142,10 +175,13 @@ def assemble(raw: pd.DataFrame) -> pd.DataFrame:
 
 def model_features(table: pd.DataFrame) -> list[str]:
     """Feature columns only - never labels, identifiers, splits or diagnostics."""
+    # spei_lag1m is deliberately NOT excluded: it is causal (last complete
+    # month) and is exactly the signal the persistence baseline uses, so the
+    # model should be allowed to build on it rather than rediscover it.
     excluded = {
         "location_id", "date", "split", "year",
         "y_flood", "y_drought", "r95p_mm",
-        "spei_now", "spei_persistence_baseline",
+        "flood_recent_activity", "spei_persistence_baseline",
     }
     return [c for c in feature_columns(table) if c not in excluded]
 

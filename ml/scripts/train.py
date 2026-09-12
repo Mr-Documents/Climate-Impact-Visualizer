@@ -65,19 +65,38 @@ TARGETS = {"flood": "y_flood", "drought": "y_drought"}
 MIN_RECALL = {"flood": 0.50, "drought": 0.70}
 
 
-def _persistence_scores(frame: pd.DataFrame) -> np.ndarray | None:
-    """Drought persistence baseline: today's SPEI, rescaled to a 0-1 score.
+def _persistence_scores(target_name: str, frame: pd.DataFrame) -> np.ndarray | None:
+    """The "assume recent conditions continue" baseline, per target.
 
-    Not a model. It exposes "assume current conditions continue" on the same
-    PR-AUC scale as everything else, because for drought that is the honest bar.
+    Not a model. It puts the naive answer on the same PR-AUC scale as everything
+    else, because that - not a random-guess floor - is the bar a learned model
+    has to clear.
+
+    Each target needs its OWN baseline. An earlier version reused the drought
+    SPEI signal for flood, which scored ROC-AUC 0.32 (worse than random) because
+    a drought index carries no information about flooding.
     """
-    if "spei_now" not in frame.columns:
-        return None
-    spei = frame["spei_now"].to_numpy(dtype=float)
-    if not np.isfinite(spei).any():
-        return None
-    # More negative SPEI means drier, so invert to make higher = more risk.
-    return np.clip((config.DROUGHT_THRESHOLD - np.nan_to_num(spei, nan=0.0)) / 2.0 + 0.5, 0, 1)
+    if target_name == "drought":
+        if "spei_lag1m" not in frame.columns:
+            return None
+        spei = frame["spei_lag1m"].to_numpy(dtype=float)
+        if not np.isfinite(spei).any():
+            return None
+        # More negative SPEI means drier, so invert: higher score = more risk.
+        return np.clip(
+            (config.DROUGHT_THRESHOLD - np.nan_to_num(spei, nan=0.0)) / 2.0 + 0.5, 0, 1
+        )
+
+    if target_name == "flood":
+        if "flood_recent_activity" not in frame.columns:
+            return None
+        recent = frame["flood_recent_activity"].to_numpy(dtype=float)
+        if not np.isfinite(recent).any():
+            return None
+        # Did flood-generating conditions occur in the preceding window?
+        return np.nan_to_num(recent, nan=0.0)
+
+    return None
 
 
 def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dict:
@@ -108,7 +127,7 @@ def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dic
     min_recall = MIN_RECALL[target_name]
 
     # Persistence is scored directly - there is nothing to fit.
-    persistence = _persistence_scores(parts[SPLIT_VALIDATION])
+    persistence = _persistence_scores(target_name, parts[SPLIT_VALIDATION])
     if persistence is not None:
         threshold = choose_threshold(y[SPLIT_VALIDATION], persistence, min_recall=min_recall)
         report = evaluate("persistence", SPLIT_VALIDATION, y[SPLIT_VALIDATION],
@@ -142,6 +161,23 @@ def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dic
     best = max(trainable, key=lambda r: (r["pr_auc"] if np.isfinite(r["pr_auc"]) else -1))
     logger.info("%s: selected %s (val PR-AUC %.4f)", target_name, best["name"], best["pr_auc"])
 
+    # A learned model that cannot beat a naive baseline has not earned its place.
+    # Say so loudly rather than quietly shipping it - this is the check that was
+    # missing when the drought model lost to persistence and was selected anyway.
+    baselines = [r for r in results if r["notes"].get("tier") == "baseline"
+                 or r["name"] == "persistence"]
+    beaten_by = [r for r in baselines
+                 if np.isfinite(r["pr_auc"]) and r["pr_auc"] > best["pr_auc"]]
+    if beaten_by:
+        strongest = max(beaten_by, key=lambda r: r["pr_auc"])
+        logger.warning(
+            "%s: NO LEARNED MODEL BEAT THE BASELINES. '%s' scores %.4f on validation "
+            "versus %.4f for the best candidate '%s'. The model is still saved for "
+            "inspection, but this must be reported as a negative result.",
+            target_name, strongest["name"], strongest["pr_auc"],
+            best["pr_auc"], best["name"],
+        )
+
     # Refit the winner on train + validation so it uses all pre-test data.
     combined_x = np.vstack([x[SPLIT_TRAIN], x[SPLIT_VALIDATION]])
     combined_y = np.concatenate([y[SPLIT_TRAIN], y[SPLIT_VALIDATION]])
@@ -163,6 +199,7 @@ def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dic
         "test": test_report.as_dict(),
         "test_error_costs": error_cost_summary(test_report),
         "test_calibration": calibration_curve(y[SPLIT_TEST], test_scores),
+        "beaten_by_baseline": [r["name"] for r in beaten_by],
         "fitted_model": winner,
         "features": features,
         "threshold": best["threshold"],

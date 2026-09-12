@@ -59,16 +59,32 @@ def test_assign_split_is_a_pure_function_of_year():
 def test_model_features_exclude_every_label_and_diagnostic(table):
     features = model_features(table)
     for forbidden in (
-        "y_flood", "y_drought", "spei_now", "spei_persistence_baseline",
-        "r95p_mm", "split", "year", "location_id", "date",
+        "y_flood", "y_drought", "spei_persistence_baseline",
+        "r95p_mm", "flood_recent_activity", "split", "year", "location_id", "date",
     ):
         assert forbidden not in features, f"{forbidden} must never be a model input"
 
 
-def test_spei_now_is_available_for_the_baseline_but_not_as_a_feature(table):
-    """The persistence baseline needs it; the model must not see it."""
-    assert "spei_now" in table.columns
-    assert "spei_now" not in model_features(table)
+def test_spei_lag1m_is_causal_and_permitted_as_a_feature(table):
+    """It is the last COMPLETE month, so it is knowable at t and may be a feature.
+
+    The earlier `spei_now` was the month CONTAINING t, which depends on days
+    after t. Using it leaked the future into both the feature space and the
+    persistence baseline.
+    """
+    assert "spei_lag1m" in table.columns
+    assert "spei_lag1m" in model_features(table)
+
+
+def test_spei_lag1m_does_not_use_the_current_month(table):
+    """A value at t must equal the previous month's index, never this month's."""
+    row = table[table["spei_lag1m"].notna()].iloc[len(table) // 2]
+    same_month = table[
+        (table["date"].dt.to_period("M") == pd.Period(row["date"], freq="M"))
+        & table["spei_lag1m"].notna()
+    ]
+    # Every day within one calendar month shares the same lagged value.
+    assert same_month["spei_lag1m"].nunique() == 1
 
 
 def test_both_targets_are_present(table):
