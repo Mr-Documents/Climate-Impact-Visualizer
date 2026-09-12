@@ -12,14 +12,13 @@ coverage.xml
 *.log
 *.log.*
 
-# Raw and processed climate data are reproducible from scripts/ and are far too
-# large for version control. locations.csv is the exception: it defines the
-# sample and must be versioned for results to be reproducible.
-data/raw/
-data/external/
+# Intermediate feature tables are rebuilt by train.py in seconds.
 data/processed/*
 !data/processed/locations.csv
 
-# Trained artefacts are reproducible from train.py; evaluation reports are
-# committed because they are the record of what was actually measured.
-models/*.joblib
+# data/raw/ IS committed (12 MB of daily parquet). Re-downloading it costs
+# ~47,000 weighted API calls - about 4.7 days against the free quota - so
+# committing it is what makes the pipeline reproducible by anyone marking it.
+#
+# models/ IS committed (46 MB). Training cannot run as a deployment build step
+# for the same quota reason, so the service needs the artefacts in the repo.
