@@ -8,22 +8,16 @@ numpy>=2.5,<3
 pandas>=3.0,<4
 scipy>=1.18,<2
 scikit-learn>=1.9,<2
-lightgbm>=4.7,<5
-xgboost>=3.4,<4
 joblib>=1.6,<2
-pyarrow>=25.0
+pyarrow>=25.0        # parquet engine for pandas (no explicit import)
 global-land-mask>=1.0
 
 # Acquisition
 requests>=2.34,<3
-tenacity>=9.0
 
 # Serving
 fastapi>=0.141,<1
 uvicorn[standard]>=0.52
 pydantic>=2.13,<3
-pydantic-settings>=2.0
-python-dotenv>=1.0
 
 # Reporting
-matplotlib>=3.11,<4

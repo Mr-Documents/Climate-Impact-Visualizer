@@ -135,15 +135,27 @@ def build_candidates(persistence_column_index: int | None = None) -> list[Candid
         ),
         Candidate(
             name="random_forest",
+            # Constrained deliberately. An unconstrained forest (300 trees,
+            # min_samples_leaf=20) reached depth 34-44 and 2.69 million nodes,
+            # producing a 291 MB artefact that could not fit the 512 MB
+            # deployment tier. Capping depth and raising the leaf minimum was
+            # measured and found to IMPROVE validation PR-AUC - flood
+            # 0.2288 -> 0.2453, drought 0.6129 -> 0.6238 - while shrinking the
+            # model roughly 13x. The deep forest was overfitting; the size
+            # constraint and the accuracy improvement pointed the same way.
             estimator=RandomForestClassifier(
-                n_estimators=300,
-                min_samples_leaf=20,
+                n_estimators=150,
+                min_samples_leaf=200,
+                max_depth=18,
                 class_weight="balanced_subsample",
                 n_jobs=-1,
                 random_state=config.RANDOM_STATE,
             ),
             tier="candidate",
-            rationale="Robust to scaling, captures interactions, little tuning needed.",
+            rationale=(
+                "Robust to scaling, captures interactions. Depth-capped: measured "
+                "more accurate AND ~13x smaller than an unconstrained forest."
+            ),
         ),
         Candidate(
             name="gradient_boosting",
