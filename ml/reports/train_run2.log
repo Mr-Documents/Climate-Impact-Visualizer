@@ -70,3 +70,34 @@
 13:30:36 INFO   base_rate              val PR-AUC=0.0358  ROC-AUC=0.5000  recall=1.000
 13:30:44 INFO   logistic_regression    val PR-AUC=0.1292  ROC-AUC=0.8561  recall=0.503
 13:32:55 INFO   random_forest          val PR-AUC=0.2288  ROC-AUC=0.8872  recall=0.505
+13:33:20 INFO   gradient_boosting      val PR-AUC=0.1911  ROC-AUC=0.8623  recall=0.503
+13:33:20 INFO flood: selected random_forest (val PR-AUC 0.2288)
+13:35:58 INFO flood: TEST PR-AUC=0.2447  recall=0.601  precision=0.217
+13:35:59 INFO y_flood: dropped 18752 rows with incomplete features
+13:36:17 INFO   spatial fold 1: PR-AUC=0.1340 on 10 held-out locations
+13:36:35 INFO   spatial fold 2: PR-AUC=0.1894 on 10 held-out locations
+13:36:54 INFO   spatial fold 3: PR-AUC=0.1390 on 10 held-out locations
+13:37:12 INFO   spatial fold 4: PR-AUC=0.0947 on 10 held-out locations
+13:37:31 INFO   spatial fold 5: PR-AUC=0.1539 on 9 held-out locations
+13:37:49 INFO   spatial fold 6: PR-AUC=0.1353 on 9 held-out locations
+13:37:50 INFO Saved C:\Users\ramzy\OneDrive\Desktop\Folders\Final Year Project\Climate impact visualizer\ml\models\flood_model.joblib
+13:37:50 INFO ======================================================================
+13:37:50 INFO TARGET: drought
+13:37:50 INFO y_drought: dropped 20722 rows with incomplete features
+13:37:51 INFO drought | train=464241 (13.81% pos)  val=85367 (23.51% pos)  test=83610 (21.27% pos)
+13:37:51 INFO   persistence            val PR-AUC=0.4557  ROC-AUC=0.7557  recall=0.718
+13:37:51 INFO   base_rate              val PR-AUC=0.2351  ROC-AUC=0.5000  recall=0.000
+13:37:59 INFO   logistic_regression    val PR-AUC=0.6081  ROC-AUC=0.8394  recall=0.701
+13:40:04 INFO   random_forest          val PR-AUC=0.6129  ROC-AUC=0.8488  recall=0.702
+13:40:25 INFO   gradient_boosting      val PR-AUC=0.6077  ROC-AUC=0.8469  recall=0.702
+13:40:25 INFO drought: selected random_forest (val PR-AUC 0.6129)
+13:42:51 INFO drought: TEST PR-AUC=0.6475  recall=0.753  precision=0.503
+13:42:51 INFO y_drought: dropped 20722 rows with incomplete features
+13:43:11 INFO   spatial fold 1: PR-AUC=0.4928 on 10 held-out locations
+13:43:29 INFO   spatial fold 2: PR-AUC=0.4970 on 10 held-out locations
+13:43:48 INFO   spatial fold 3: PR-AUC=0.5090 on 10 held-out locations
+13:44:06 INFO   spatial fold 4: PR-AUC=0.4889 on 10 held-out locations
+13:44:24 INFO   spatial fold 5: PR-AUC=0.4842 on 10 held-out locations
+13:44:42 INFO   spatial fold 6: PR-AUC=0.5180 on 9 held-out locations
+13:44:45 INFO Saved C:\Users\ramzy\OneDrive\Desktop\Folders\Final Year Project\Climate impact visualizer\ml\models\drought_model.joblib
+13:44:45 INFO Wrote C:\Users\ramzy\OneDrive\Desktop\Folders\Final Year Project\Climate impact visualizer\ml\reports\training_report.json
