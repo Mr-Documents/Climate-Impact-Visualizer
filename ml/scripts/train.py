@@ -102,6 +102,26 @@ def _persistence_scores(target_name: str, frame: pd.DataFrame) -> np.ndarray | N
     return None
 
 
+def _fit(estimator, x: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None):
+    """Fit, passing sample_weight only when there is one and the estimator takes it.
+
+    A scikit-learn Pipeline rejects ``sample_weight`` outright - even as None -
+    and raises ValueError rather than TypeError, so the argument is omitted
+    entirely when unweighted, and unsupported estimators fall back gracefully.
+    """
+    if sample_weight is None:
+        estimator.fit(x, y)
+        return
+    try:
+        estimator.fit(x, y, sample_weight=sample_weight)
+    except (TypeError, ValueError) as exc:
+        if "sample_weight" not in str(exc):
+            raise
+        logger.debug("%s ignores sample_weight; fitting unweighted",
+                     type(estimator).__name__)
+        estimator.fit(x, y)
+
+
 def _select_calibration(model, x_val: np.ndarray, y_val: np.ndarray, target_name: str):
     """Choose between sigmoid and isotonic calibration on held-out data.
 
@@ -182,8 +202,28 @@ def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dic
         if part[column].nunique() < 2:
             logger.warning("%s: split '%s' contains a single class", target_name, split_name)
 
+    # Restrict the training rows to this target's window. Validation and test
+    # are never trimmed - only what the model learns from changes.
+    window = config.TRAINING_WINDOW[target_name]
+    if window["first_year"] > 1995:
+        before = len(parts[SPLIT_TRAIN])
+        parts[SPLIT_TRAIN] = parts[SPLIT_TRAIN][
+            parts[SPLIT_TRAIN]["year"] >= window["first_year"]
+        ]
+        logger.info("%s: training window %d-%d (%d of %d rows)", target_name,
+                    window["first_year"], config.TRAIN_END_YEAR,
+                    len(parts[SPLIT_TRAIN]), before)
+
     x = {s: p[features].to_numpy() for s, p in parts.items()}
     y = {s: p[column].to_numpy().astype(int) for s, p in parts.items()}
+
+    # Recency weighting inside the window, if this target uses it.
+    half_life = window["half_life_years"]
+    train_weight = None
+    if half_life:
+        age = config.TRAIN_END_YEAR - parts[SPLIT_TRAIN]["year"].to_numpy()
+        train_weight = 0.5 ** (age / half_life)
+        logger.info("%s: recency weighting, half-life %.0f years", target_name, half_life)
 
     logger.info(
         "%s | train=%d (%.2f%% pos)  val=%d (%.2f%% pos)  test=%d (%.2f%% pos)",
@@ -211,7 +251,7 @@ def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dic
 
     for candidate in build_candidates():
         started = time.time()
-        candidate.estimator.fit(x[SPLIT_TRAIN], y[SPLIT_TRAIN])
+        _fit(candidate.estimator, x[SPLIT_TRAIN], y[SPLIT_TRAIN], train_weight)
         scores = candidate.estimator.predict_proba(x[SPLIT_VALIDATION])[:, 1]
         threshold = choose_threshold(y[SPLIT_VALIDATION], scores, min_recall=min_recall)
 
@@ -252,7 +292,7 @@ def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dic
     # Choosing the calibration method needs a model that has not seen the
     # validation rows, so fit one on TRAIN only purely for that decision.
     probe = next(c for c in build_candidates() if c.name == best["name"]).estimator
-    probe.fit(x[SPLIT_TRAIN], y[SPLIT_TRAIN])
+    _fit(probe, x[SPLIT_TRAIN], y[SPLIT_TRAIN], train_weight)
     method, calibration_info = _select_calibration(
         probe, x[SPLIT_VALIDATION], y[SPLIT_VALIDATION], target_name
     )
@@ -271,7 +311,11 @@ def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dic
     combined_y = np.concatenate([y[SPLIT_TRAIN], y[SPLIT_VALIDATION]])
     base = next(c for c in build_candidates() if c.name == best["name"]).estimator
     calibrated = CalibratedClassifierCV(base, method=method, cv=3, ensemble=False)
-    calibrated.fit(combined_x, combined_y)
+    combined_weight = (
+        np.concatenate([train_weight, np.ones(len(y[SPLIT_VALIDATION]))])
+        if train_weight is not None else None
+    )
+    _fit(calibrated, combined_x, combined_y, combined_weight)
     calibration_info["final_fit"] = "cross-validated on train+validation (cv=3, ensemble=False)"
 
     # The threshold must be retuned: calibration rescales probabilities, so a
@@ -300,6 +344,7 @@ def evaluate_temporal(target_name: str, column: str, table: pd.DataFrame) -> dic
         "features": features,
         "threshold": threshold,
         "calibration": calibration_info,
+        "training_window": window,
     }
 
 

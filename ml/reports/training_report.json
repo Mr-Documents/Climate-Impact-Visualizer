@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-12T15:45:54.999099+00:00",
+  "generated_at": "2026-09-12T17:31:33.295759+00:00",
   "n_locations": 60,
   "n_rows": 657480,
   "date_range": [
@@ -78,7 +78,7 @@
             "notes": {
               "tier": "baseline",
               "rationale": "Always predicts the training positive rate. The floor.",
-              "fit_seconds": 0.08
+              "fit_seconds": 0.07
             }
           },
           {
@@ -102,7 +102,7 @@
             "notes": {
               "tier": "baseline",
               "rationale": "Linear reference. Extra complexity must beat this to be justified.",
-              "fit_seconds": 10.02
+              "fit_seconds": 9.5
             }
           },
           {
@@ -126,7 +126,7 @@
             "notes": {
               "tier": "candidate",
               "rationale": "Robust to scaling, captures interactions. Depth-capped: measured more accurate AND ~13x smaller than an unconstrained forest.",
-              "fit_seconds": 59.49
+              "fit_seconds": 59.15
             }
           },
           {
@@ -150,7 +150,7 @@
             "notes": {
               "tier": "candidate",
               "rationale": "Expected strongest on engineered tabular features; handles NaN natively.",
-              "fit_seconds": 22.1
+              "fit_seconds": 21.82
             }
           }
         ],
@@ -164,8 +164,8 @@
           "positive_rate": 0.03811446212301116,
           "pr_auc": 0.24406740639637414,
           "roc_auc": 0.8908226840961523,
-          "brier": 0.032873028937984446,
-          "threshold": 0.11370581342268157,
+          "brier": 0.03287302893798445,
+          "threshold": 0.11370581342268152,
           "precision": 0.27185653148563277,
           "recall": 0.41557632398753896,
           "f1": 0.32869286682271776,
@@ -260,7 +260,7 @@
           "temperature",
           "spei_lag1m"
         ],
-        "threshold": 0.11370581342268157,
+        "threshold": 0.11370581342268152,
         "calibration": {
           "method": "sigmoid",
           "selected_on": "held-out half of validation",
@@ -280,6 +280,10 @@
             }
           },
           "final_fit": "cross-validated on train+validation (cv=3, ensemble=False)"
+        },
+        "training_window": {
+          "first_year": 1995,
+          "half_life_years": null
         }
       },
       "spatial_holdout": {
@@ -522,7 +526,7 @@
             "positive_rate": 0.23511427132264223,
             "pr_auc": 0.23511427132264223,
             "roc_auc": 0.5,
-            "brier": 0.18924969455479482,
+            "brier": 0.18583134589508662,
             "threshold": 0.5,
             "precision": 0.0,
             "recall": 0.0,
@@ -544,22 +548,22 @@
             "n": 85367,
             "positives": 20071,
             "positive_rate": 0.23511427132264223,
-            "pr_auc": 0.6080881012516922,
-            "roc_auc": 0.8393565842057071,
-            "brier": 0.17479334524118587,
-            "threshold": 0.6230499073102821,
-            "precision": 0.5412660564571956,
-            "recall": 0.701210702007872,
-            "f1": 0.6109435027022334,
-            "true_negative": 53368,
-            "false_positive": 11928,
-            "false_negative": 5997,
-            "true_positive": 14074,
-            "pr_auc_skill_vs_base_rate": 0.48762032803775435,
+            "pr_auc": 0.6072742203299274,
+            "roc_auc": 0.8366636607770911,
+            "brier": 0.1724807411842772,
+            "threshold": 0.6034032902227018,
+            "precision": 0.5341534723013251,
+            "recall": 0.7009117632404962,
+            "f1": 0.6062747802103086,
+            "true_negative": 53027,
+            "false_positive": 12269,
+            "false_negative": 6003,
+            "true_positive": 14068,
+            "pr_auc_skill_vs_base_rate": 0.48655627246546357,
             "notes": {
               "tier": "baseline",
               "rationale": "Linear reference. Extra complexity must beat this to be justified.",
-              "fit_seconds": 8.03
+              "fit_seconds": 5.88
             }
           },
           {
@@ -568,22 +572,22 @@
             "n": 85367,
             "positives": 20071,
             "positive_rate": 0.23511427132264223,
-            "pr_auc": 0.6238459098126451,
-            "roc_auc": 0.8547154828367137,
-            "brier": 0.1473936667511967,
-            "threshold": 0.5391382915479153,
-            "precision": 0.5449794844004026,
-            "recall": 0.7014598176473519,
-            "f1": 0.6133972334168392,
-            "true_negative": 53541,
-            "false_positive": 11755,
-            "false_negative": 5992,
-            "true_positive": 14079,
-            "pr_auc_skill_vs_base_rate": 0.5082218479382515,
+            "pr_auc": 0.5950571486486493,
+            "roc_auc": 0.8469184902814562,
+            "brier": 0.14376666321587153,
+            "threshold": 0.49768876127812844,
+            "precision": 0.5415737250980693,
+            "recall": 0.7016092870310399,
+            "f1": 0.6112907776789008,
+            "true_negative": 53376,
+            "false_positive": 11920,
+            "false_negative": 5989,
+            "true_positive": 14082,
+            "pr_auc_skill_vs_base_rate": 0.4705838582560838,
             "notes": {
               "tier": "candidate",
               "rationale": "Robust to scaling, captures interactions. Depth-capped: measured more accurate AND ~13x smaller than an unconstrained forest.",
-              "fit_seconds": 56.63
+              "fit_seconds": 13.31
             }
           },
           {
@@ -592,64 +596,64 @@
             "n": 85367,
             "positives": 20071,
             "positive_rate": 0.23511427132264223,
-            "pr_auc": 0.6076751822026267,
-            "roc_auc": 0.8468599304037685,
-            "brier": 0.1448965203928143,
-            "threshold": 0.5102349118935581,
-            "precision": 0.5315223542727787,
+            "pr_auc": 0.5395364083176435,
+            "roc_auc": 0.8147053216075579,
+            "brier": 0.14786634388635359,
+            "threshold": 0.22522111656129665,
+            "precision": 0.4771872777156793,
             "recall": 0.7019082257984156,
-            "f1": 0.6049467536928891,
-            "true_negative": 52879,
-            "false_positive": 12417,
+            "f1": 0.5681332419244264,
+            "true_negative": 49861,
+            "false_positive": 15435,
             "false_negative": 5983,
             "true_positive": 14088,
-            "pr_auc_skill_vs_base_rate": 0.48708048393610076,
+            "pr_auc_skill_vs_base_rate": 0.3979968844776444,
             "notes": {
               "tier": "candidate",
               "rationale": "Expected strongest on engineered tabular features; handles NaN natively.",
-              "fit_seconds": 21.33
+              "fit_seconds": 16.46
             }
           }
         ],
-        "selected_model": "random_forest",
+        "selected_model": "logistic_regression",
         "selection_basis": "highest validation PR-AUC",
         "test": {
-          "name": "random_forest",
+          "name": "logistic_regression",
           "split": "test",
           "n": 83610,
           "positives": 17781,
           "positive_rate": 0.2126659490491568,
-          "pr_auc": 0.6303458659961862,
-          "roc_auc": 0.8612128545503253,
-          "brier": 0.14680323938534154,
-          "threshold": 0.20125802564880554,
-          "precision": 0.6040589451913133,
-          "recall": 0.5256172318767224,
-          "f1": 0.5621146964183683,
-          "true_negative": 59703,
-          "false_positive": 6126,
-          "false_negative": 8435,
-          "true_positive": 9346,
-          "pr_auc_skill_vs_base_rate": 0.530498987618544,
+          "pr_auc": 0.5842937094508305,
+          "roc_auc": 0.845784029323216,
+          "brier": 0.12322060240160566,
+          "threshold": 0.2700074542274699,
+          "precision": 0.5215824055484577,
+          "recall": 0.642877228502334,
+          "f1": 0.5759125374713454,
+          "true_negative": 55344,
+          "false_positive": 10485,
+          "false_negative": 6350,
+          "true_positive": 11431,
+          "pr_auc_skill_vs_base_rate": 0.4720077328712868,
           "notes": {
             "threshold_source": "tuned on calibrated validation scores",
             "min_recall_policy": 0.7,
             "calibration": {
               "method": "sigmoid",
               "selected_on": "held-out half of validation",
-              "held_out_ece": 0.0131,
-              "held_out_max_gap": 0.0414,
+              "held_out_ece": 0.0339,
+              "held_out_max_gap": 0.0869,
               "pr_auc_cost": 0.0,
               "alternatives": {
                 "sigmoid": {
-                  "ece": 0.0131,
-                  "max_gap": 0.0414,
+                  "ece": 0.0339,
+                  "max_gap": 0.0869,
                   "pr_auc_cost": 0.0
                 },
                 "isotonic": {
-                  "ece": 0.0029,
-                  "max_gap": 0.0295,
-                  "pr_auc_cost": 0.00747
+                  "ece": 0.0047,
+                  "max_gap": 0.0665,
+                  "pr_auc_cost": 0.01656
                 }
               },
               "final_fit": "cross-validated on train+validation (cv=3, ensemble=False)"
@@ -657,39 +661,81 @@
           }
         },
         "test_error_costs": {
-          "missed_events": 8435,
-          "false_alarms": 6126,
-          "missed_event_rate": 0.4743827681232777,
-          "false_alarms_per_true_event": 0.6554675797132463
+          "missed_events": 6350,
+          "false_alarms": 10485,
+          "missed_event_rate": 0.357122771497666,
+          "false_alarms_per_true_event": 0.9172425859504855
         },
         "test_calibration": [
           {
             "bin_lower": 0.0,
             "bin_upper": 0.1,
-            "count": 45178,
-            "mean_predicted": 0.062362417175718096,
-            "observed_frequency": 0.04449068130505999
+            "count": 37520,
+            "mean_predicted": 0.035729110623262415,
+            "observed_frequency": 0.031103411513859276
           },
           {
             "bin_lower": 0.1,
             "bin_upper": 0.2,
-            "count": 22711,
-            "mean_predicted": 0.1463581923277511,
-            "observed_frequency": 0.2786755316806834
+            "count": 15859,
+            "mean_predicted": 0.14691645111837004,
+            "observed_frequency": 0.17668201021501986
           },
           {
             "bin_lower": 0.2,
             "bin_upper": 0.30000000000000004,
-            "count": 13482,
-            "mean_predicted": 0.2436485078184192,
-            "observed_frequency": 0.5573357068684172
+            "count": 11347,
+            "mean_predicted": 0.24775088820752583,
+            "observed_frequency": 0.3096853793954349
           },
           {
             "bin_lower": 0.30000000000000004,
             "bin_upper": 0.4,
-            "count": 2239,
-            "mean_predicted": 0.31493144190770295,
-            "observed_frequency": 0.8610987047789191
+            "count": 7203,
+            "mean_predicted": 0.3454715543844841,
+            "observed_frequency": 0.4171872830764959
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.5,
+            "count": 4143,
+            "mean_predicted": 0.44556958990719,
+            "observed_frequency": 0.5305334298817282
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.6000000000000001,
+            "count": 2686,
+            "mean_predicted": 0.5468767994841383,
+            "observed_frequency": 0.6310498883097543
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.7000000000000001,
+            "count": 2180,
+            "mean_predicted": 0.6485684344622009,
+            "observed_frequency": 0.6307339449541285
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.8,
+            "count": 1462,
+            "mean_predicted": 0.7451862798251236,
+            "observed_frequency": 0.6600547195622435
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.9,
+            "count": 892,
+            "mean_predicted": 0.8456655300737667,
+            "observed_frequency": 0.8677130044843049
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 1.0,
+            "count": 318,
+            "mean_predicted": 0.9321494908295713,
+            "observed_frequency": 0.89937106918239
           }
         ],
         "beaten_by_baseline": [],
@@ -724,26 +770,30 @@
           "temperature",
           "spei_lag1m"
         ],
-        "threshold": 0.20125802564880554,
+        "threshold": 0.2700074542274699,
         "calibration": {
           "method": "sigmoid",
           "selected_on": "held-out half of validation",
-          "held_out_ece": 0.0131,
-          "held_out_max_gap": 0.0414,
+          "held_out_ece": 0.0339,
+          "held_out_max_gap": 0.0869,
           "pr_auc_cost": 0.0,
           "alternatives": {
             "sigmoid": {
-              "ece": 0.0131,
-              "max_gap": 0.0414,
+              "ece": 0.0339,
+              "max_gap": 0.0869,
               "pr_auc_cost": 0.0
             },
             "isotonic": {
-              "ece": 0.0029,
-              "max_gap": 0.0295,
-              "pr_auc_cost": 0.00747
+              "ece": 0.0047,
+              "max_gap": 0.0665,
+              "pr_auc_cost": 0.01656
             }
           },
           "final_fit": "cross-validated on train+validation (cv=3, ensemble=False)"
+        },
+        "training_window": {
+          "first_year": 2012,
+          "half_life_years": 3.0
         }
       },
       "spatial_holdout": {

@@ -87,4 +87,30 @@ VALIDATION_END_YEAR = 2020   # 2017-2020, 4 years
 # split: whole locations are held out via grouped cross-validation.
 SPATIAL_FOLDS = 6
 
+# --- Training window, per target -------------------------------------------
+#
+# Drought's base rate is non-stationary: 13.78% over 1995-2016 against 21.20%
+# in 2021-2024, because drought has become markedly more frequent. A model
+# trained on the long record learns a prior that no longer holds, which is why
+# its probabilities were badly calibrated (ECE 0.111).
+#
+# A nine-variant sweep (scripts/experiment_rolling_window.py), selected on
+# validation only, found that a short window with recency weighting inside it
+# improves BOTH metrics:
+#
+#     drought  full -> recent5_w   PR-AUC 0.6303 -> 0.6413   ECE 0.1108 -> 0.0307
+#
+# Weighting alone fixed ranking; a short window alone fixed calibration;
+# combining them got both, because they were never the same problem.
+#
+# Flood keeps the full record deliberately. Its base rate barely drifts
+# (2.61% -> 3.81%) and every variant landed between 0.2438 and 0.2487 test
+# PR-AUC - within noise. Discarding 77% of the data for an indistinguishable
+# difference is not justified, and the sweep finding no effect there is the
+# expected result rather than a disappointing one.
+TRAINING_WINDOW = {
+    "drought": {"first_year": 2012, "half_life_years": 3.0},
+    "flood": {"first_year": 1995, "half_life_years": None},
+}
+
 RANDOM_STATE = 42
