@@ -3,6 +3,14 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
+.coverage
+coverage.xml
+
+# Run logs are machine-specific and regenerate on every run. The committed
+# record of what was measured is reports/training_report.json, not the console
+# transcript.
+*.log
+*.log.*
 
 # Raw and processed climate data are reproducible from scripts/ and are far too
 # large for version control. locations.csv is the exception: it defines the

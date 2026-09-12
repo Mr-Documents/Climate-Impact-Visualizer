@@ -207,7 +207,7 @@ rate, predicting "no flood" every day scores 96.2% and is useless.
 | base_rate | baseline | 0.0358 |
 | persistence | baseline | 0.0895 |
 | logistic_regression | baseline | 0.1292 |
-| **random_forest** | candidate | **0.2288** ← selected |
+| **random_forest** | candidate | **0.2453** ← selected |
 | gradient_boosting | candidate | 0.1911 |
 
 **Drought** (validation PR-AUC)
@@ -217,8 +217,17 @@ rate, predicting "no flood" every day scores 96.2% and is useless.
 | base_rate | baseline | 0.2351 |
 | persistence | baseline | 0.4557 |
 | logistic_regression | baseline | 0.6081 |
-| **random_forest** | candidate | **0.6129** ← selected |
+| **random_forest** | candidate | **0.6238** ← selected |
 | gradient_boosting | candidate | 0.6077 |
+
+**Forest sizing.** The random forest is deliberately constrained
+(150 trees, `min_samples_leaf=200`, `max_depth=18`). An unconstrained forest
+(300 trees, leaf 20) reached depth 34–44 and 2.69 million nodes, producing a
+557 MB pair of artefacts that exceeded the 512 MB deployment tier. Constraining
+it was measured and found to *improve* validation PR-AUC — flood 0.2288 → 0.2453,
+drought 0.6129 → 0.6238 — while shrinking the models 12× to 46.2 MB. The deep
+forest was overfitting; the deployment limit and the generalisation gain pointed
+the same way.
 
 Gradient boosting lost on both targets, contrary to the expectation stated in
 advance. No sequence model was trained: with rolling accumulations and anomalies
@@ -232,20 +241,20 @@ from the production dependency list.
 |---|---|---|
 | n | 84,220 | 83,610 |
 | positives | 3,210 (3.81%) | 17,781 (21.27%) |
-| **PR-AUC** | **0.2447** | **0.6475** |
-| ROC-AUC | 0.8902 | 0.8659 |
-| Brier | 0.0575 | 0.1192 |
-| Precision | 0.2174 | 0.5035 |
-| Recall | 0.6006 | 0.7532 |
-| F1 | 0.3193 | 0.6035 |
-| Threshold | 0.4123 | 0.3696 |
+| **PR-AUC** | **0.2441** | **0.6303** |
+| ROC-AUC | 0.8908 | 0.8612 |
+| Brier | 0.1302 | 0.1452 |
+| Precision | 0.2326 | 0.5069 |
+| Recall | 0.5458 | 0.7308 |
+| F1 | 0.3262 | 0.5986 |
+| Threshold | 0.7385 | 0.5391 |
 | **vs base rate** | **6.4×** | **3.0×** |
 
 Confusion matrices:
 
 ```
-FLOOD     TN 74,070   FP 6,940   FN 1,282   TP 1,928
-DROUGHT   TN 52,623   FP 13,206  FN 4,389   TP 13,392
+FLOOD     TN 75,231   FP 5,779   FN 1,458   TP 1,752
+DROUGHT   TN 53,189   FP 12,640  FN 4,787   TP 12,994
 ```
 
 ### Spatial generalisation
@@ -253,7 +262,7 @@ DROUGHT   TN 52,623   FP 13,206  FN 4,389   TP 13,392
 | | Mean PR-AUC | SD | Degradation vs temporal |
 |---|---|---|---|
 | Flood | 0.1410 | 0.0281 | −42% |
-| Drought | 0.4983 | 0.0117 | −23% |
+| Drought | 0.4983 | 0.0117 | −21% |
 
 Both remain well above their base rates in locations never seen in training, but
 performance is **materially worse** than the temporal figures. Quoting only the
@@ -267,9 +276,9 @@ Thresholds were tuned toward recall (flood ≥ 0.50, drought ≥ 0.70) on the st
 policy that a missed hazard costs more than a false alarm. This is a value
 judgement, not an optimum, and it is the reason precision is low:
 
-- **Flood:** 1,282 missed events, 6,940 false alarms — **3.6 false alarms per
+- **Flood:** 1,458 missed events, 5,779 false alarms — **3.3 false alarms per
   true event.**
-- **Drought:** 4,389 missed, 13,206 false alarms — 1.0 per true event.
+- **Drought:** 4,787 missed, 12,640 false alarms — 1.0 per true event.
 
 A deployment with different costs should retune the threshold; nothing else
 needs to change.

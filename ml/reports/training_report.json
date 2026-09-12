@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-12T13:30:35.276643+00:00",
+  "generated_at": "2026-09-12T14:52:16.219261+00:00",
   "n_locations": 60,
   "n_rows": 657480,
   "date_range": [
@@ -78,7 +78,7 @@
             "notes": {
               "tier": "baseline",
               "rationale": "Always predicts the training positive rate. The floor.",
-              "fit_seconds": 0.06
+              "fit_seconds": 0.05
             }
           },
           {
@@ -102,7 +102,7 @@
             "notes": {
               "tier": "baseline",
               "rationale": "Linear reference. Extra complexity must beat this to be justified.",
-              "fit_seconds": 8.6
+              "fit_seconds": 9.8
             }
           },
           {
@@ -111,22 +111,22 @@
             "n": 84394,
             "positives": 3024,
             "positive_rate": 0.035831931179941705,
-            "pr_auc": 0.2287758464972688,
-            "roc_auc": 0.8871500630245407,
-            "brier": 0.05132749240309966,
-            "threshold": 0.412288839287762,
-            "precision": 0.2139157216855663,
-            "recall": 0.5052910052910053,
-            "f1": 0.30058030884233305,
-            "true_negative": 75755,
-            "false_positive": 5615,
-            "false_negative": 1496,
-            "true_positive": 1528,
-            "pr_auc_skill_vs_base_rate": 0.20011440075323214,
+            "pr_auc": 0.2453091623659644,
+            "roc_auc": 0.8899429121531862,
+            "brier": 0.12724534519079947,
+            "threshold": 0.7385393605905307,
+            "precision": 0.2290443942814146,
+            "recall": 0.5033068783068783,
+            "f1": 0.3148205605543489,
+            "true_negative": 76247,
+            "false_positive": 5123,
+            "false_negative": 1502,
+            "true_positive": 1522,
+            "pr_auc_skill_vs_base_rate": 0.21726215372635121,
             "notes": {
               "tier": "candidate",
-              "rationale": "Robust to scaling, captures interactions, little tuning needed.",
-              "fit_seconds": 131.05
+              "rationale": "Robust to scaling, captures interactions. Depth-capped: measured more accurate AND ~13x smaller than an unconstrained forest.",
+              "fit_seconds": 57.68
             }
           },
           {
@@ -150,7 +150,7 @@
             "notes": {
               "tier": "candidate",
               "rationale": "Expected strongest on engineered tabular features; handles NaN natively.",
-              "fit_seconds": 24.94
+              "fit_seconds": 20.69
             }
           }
         ],
@@ -162,99 +162,99 @@
           "n": 84220,
           "positives": 3210,
           "positive_rate": 0.03811446212301116,
-          "pr_auc": 0.24465986039451246,
-          "roc_auc": 0.8901548960725973,
-          "brier": 0.05750216380854203,
-          "threshold": 0.412288839287762,
-          "precision": 0.2174109156517817,
-          "recall": 0.6006230529595016,
-          "f1": 0.3192581553237291,
-          "true_negative": 74070,
-          "false_positive": 6940,
-          "false_negative": 1282,
-          "true_positive": 1928,
-          "pr_auc_skill_vs_base_rate": 0.21472970549840564,
+          "pr_auc": 0.24406740639637411,
+          "roc_auc": 0.8908226840961523,
+          "brier": 0.13016491363796548,
+          "threshold": 0.7385393605905307,
+          "precision": 0.23263842783162927,
+          "recall": 0.5457943925233645,
+          "f1": 0.32622660832324735,
+          "true_negative": 75231,
+          "false_positive": 5779,
+          "false_negative": 1458,
+          "true_positive": 1752,
+          "pr_auc_skill_vs_base_rate": 0.21411377566599962,
           "notes": {
             "threshold_source": "tuned on validation, applied unchanged",
             "min_recall_policy": 0.5
           }
         },
         "test_error_costs": {
-          "missed_events": 1282,
-          "false_alarms": 6940,
-          "missed_event_rate": 0.3993769470404984,
-          "false_alarms_per_true_event": 3.599585062240664
+          "missed_events": 1458,
+          "false_alarms": 5779,
+          "missed_event_rate": 0.4542056074766355,
+          "false_alarms_per_true_event": 3.29851598173516
         },
         "test_calibration": [
           {
             "bin_lower": 0.0,
             "bin_upper": 0.1,
-            "count": 50030,
-            "mean_predicted": 0.0318697468694021,
-            "observed_frequency": 0.003557865280831501
+            "count": 32452,
+            "mean_predicted": 0.03623764668406254,
+            "observed_frequency": 0.0013250338962159497
           },
           {
             "bin_lower": 0.1,
             "bin_upper": 0.2,
-            "count": 13181,
-            "mean_predicted": 0.14238273224707246,
-            "observed_frequency": 0.020028829375616418
+            "count": 13274,
+            "mean_predicted": 0.1460983861803494,
+            "observed_frequency": 0.006026819346090101
           },
           {
             "bin_lower": 0.2,
             "bin_upper": 0.30000000000000004,
-            "count": 6763,
-            "mean_predicted": 0.2462259881661264,
-            "observed_frequency": 0.05145645423628567
+            "count": 8725,
+            "mean_predicted": 0.24638536696463628,
+            "observed_frequency": 0.012836676217765044
           },
           {
             "bin_lower": 0.30000000000000004,
             "bin_upper": 0.4,
-            "count": 4896,
-            "mean_predicted": 0.34750925192941423,
-            "observed_frequency": 0.08966503267973856
+            "count": 6016,
+            "mean_predicted": 0.34697918476705314,
+            "observed_frequency": 0.020279255319148936
           },
           {
             "bin_lower": 0.4,
             "bin_upper": 0.5,
-            "count": 3358,
-            "mean_predicted": 0.44658459823566965,
-            "observed_frequency": 0.13609291244788566
+            "count": 4882,
+            "mean_predicted": 0.4487786755228083,
+            "observed_frequency": 0.03318312167144613
           },
           {
             "bin_lower": 0.5,
             "bin_upper": 0.6000000000000001,
-            "count": 2334,
-            "mean_predicted": 0.5471321595142893,
-            "observed_frequency": 0.1953727506426735
+            "count": 4628,
+            "mean_predicted": 0.5496682902894665,
+            "observed_frequency": 0.05942091616248919
           },
           {
             "bin_lower": 0.6000000000000001,
             "bin_upper": 0.7000000000000001,
-            "count": 1572,
-            "mean_predicted": 0.6467858323223025,
-            "observed_frequency": 0.23473282442748092
+            "count": 4868,
+            "mean_predicted": 0.6502758010902917,
+            "observed_frequency": 0.088126540673788
           },
           {
             "bin_lower": 0.7000000000000001,
             "bin_upper": 0.8,
-            "count": 1269,
-            "mean_predicted": 0.7475427533747696,
-            "observed_frequency": 0.30181245074862095
+            "count": 4569,
+            "mean_predicted": 0.7488340062206783,
+            "observed_frequency": 0.14664040271394177
           },
           {
             "bin_lower": 0.8,
             "bin_upper": 0.9,
-            "count": 699,
-            "mean_predicted": 0.8406112265456334,
-            "observed_frequency": 0.3834048640915594
+            "count": 3780,
+            "mean_predicted": 0.8481060581089046,
+            "observed_frequency": 0.24735449735449735
           },
           {
             "bin_lower": 0.9,
             "bin_upper": 1.0,
-            "count": 118,
-            "mean_predicted": 0.9253251107991588,
-            "observed_frequency": 0.4067796610169492
+            "count": 1026,
+            "mean_predicted": 0.920912420448679,
+            "observed_frequency": 0.3723196881091618
           }
         ],
         "beaten_by_baseline": [],
@@ -289,7 +289,7 @@
           "temperature",
           "spei_lag1m"
         ],
-        "threshold": 0.412288839287762
+        "threshold": 0.7385393605905307
       },
       "spatial_holdout": {
         "skipped": false,
@@ -544,7 +544,7 @@
             "notes": {
               "tier": "baseline",
               "rationale": "Always predicts the training positive rate. The floor.",
-              "fit_seconds": 0.05
+              "fit_seconds": 0.04
             }
           },
           {
@@ -568,7 +568,7 @@
             "notes": {
               "tier": "baseline",
               "rationale": "Linear reference. Extra complexity must beat this to be justified.",
-              "fit_seconds": 8.27
+              "fit_seconds": 7.65
             }
           },
           {
@@ -577,22 +577,22 @@
             "n": 85367,
             "positives": 20071,
             "positive_rate": 0.23511427132264223,
-            "pr_auc": 0.6128735797364939,
-            "roc_auc": 0.8487874073442123,
-            "brier": 0.12824095374874497,
-            "threshold": 0.3696355473629375,
-            "precision": 0.5421121452195985,
-            "recall": 0.7023068108215834,
-            "f1": 0.611898508888069,
-            "true_negative": 53390,
-            "false_positive": 11906,
-            "false_negative": 5975,
-            "true_positive": 14096,
-            "pr_auc_skill_vs_base_rate": 0.4938767900233594,
+            "pr_auc": 0.6238459098126451,
+            "roc_auc": 0.8547154828367137,
+            "brier": 0.1473936667511967,
+            "threshold": 0.5391382915479153,
+            "precision": 0.5449794844004026,
+            "recall": 0.7014598176473519,
+            "f1": 0.6133972334168392,
+            "true_negative": 53541,
+            "false_positive": 11755,
+            "false_negative": 5992,
+            "true_positive": 14079,
+            "pr_auc_skill_vs_base_rate": 0.5082218479382515,
             "notes": {
               "tier": "candidate",
-              "rationale": "Robust to scaling, captures interactions, little tuning needed.",
-              "fit_seconds": 125.01
+              "rationale": "Robust to scaling, captures interactions. Depth-capped: measured more accurate AND ~13x smaller than an unconstrained forest.",
+              "fit_seconds": 54.76
             }
           },
           {
@@ -616,7 +616,7 @@
             "notes": {
               "tier": "candidate",
               "rationale": "Expected strongest on engineered tabular features; handles NaN natively.",
-              "fit_seconds": 20.29
+              "fit_seconds": 20.09
             }
           }
         ],
@@ -628,99 +628,99 @@
           "n": 83610,
           "positives": 17781,
           "positive_rate": 0.2126659490491568,
-          "pr_auc": 0.6475015114692482,
-          "roc_auc": 0.8658902116738458,
-          "brier": 0.11923252575391913,
-          "threshold": 0.3696355473629375,
-          "precision": 0.5034965034965035,
-          "recall": 0.7531634891175975,
-          "f1": 0.6035286960048671,
-          "true_negative": 52623,
-          "false_positive": 13206,
-          "false_negative": 4389,
-          "true_positive": 13392,
-          "pr_auc_skill_vs_base_rate": 0.5522885259375631,
+          "pr_auc": 0.6303458659961862,
+          "roc_auc": 0.8612128545503253,
+          "brier": 0.14515430174999014,
+          "threshold": 0.5391382915479153,
+          "precision": 0.5069048919403917,
+          "recall": 0.7307800461166414,
+          "f1": 0.598594955660486,
+          "true_negative": 53189,
+          "false_positive": 12640,
+          "false_negative": 4787,
+          "true_positive": 12994,
+          "pr_auc_skill_vs_base_rate": 0.530498987618544,
           "notes": {
             "threshold_source": "tuned on validation, applied unchanged",
             "min_recall_policy": 0.7
           }
         },
         "test_error_costs": {
-          "missed_events": 4389,
-          "false_alarms": 13206,
-          "missed_event_rate": 0.24683651088240258,
-          "false_alarms_per_true_event": 0.9861111111111112
+          "missed_events": 4787,
+          "false_alarms": 12640,
+          "missed_event_rate": 0.2692199538833586,
+          "false_alarms_per_true_event": 0.9727566569185778
         },
         "test_calibration": [
           {
             "bin_lower": 0.0,
             "bin_upper": 0.1,
-            "count": 31652,
-            "mean_predicted": 0.03878629566168809,
-            "observed_frequency": 0.016965752559079995
+            "count": 21535,
+            "mean_predicted": 0.049356224317123575,
+            "observed_frequency": 0.008358486185279778
           },
           {
             "bin_lower": 0.1,
             "bin_upper": 0.2,
-            "count": 11658,
-            "mean_predicted": 0.14636202999028672,
-            "observed_frequency": 0.09504203122319438
+            "count": 11635,
+            "mean_predicted": 0.14562113423348508,
+            "observed_frequency": 0.03472281908036098
           },
           {
             "bin_lower": 0.2,
             "bin_upper": 0.30000000000000004,
-            "count": 8642,
-            "mean_predicted": 0.24766623125841436,
-            "observed_frequency": 0.18224947928720203
+            "count": 8225,
+            "mean_predicted": 0.24870993500216806,
+            "observed_frequency": 0.10249240121580547
           },
           {
             "bin_lower": 0.30000000000000004,
             "bin_upper": 0.4,
-            "count": 7019,
-            "mean_predicted": 0.348400126489634,
-            "observed_frequency": 0.23935033480552786
+            "count": 7280,
+            "mean_predicted": 0.3494106764507157,
+            "observed_frequency": 0.16483516483516483
           },
           {
             "bin_lower": 0.4,
             "bin_upper": 0.5,
-            "count": 6131,
-            "mean_predicted": 0.4489402754962429,
-            "observed_frequency": 0.3353449681944218
+            "count": 6625,
+            "mean_predicted": 0.45119174545322627,
+            "observed_frequency": 0.21932075471698112
           },
           {
             "bin_lower": 0.5,
             "bin_upper": 0.6000000000000001,
-            "count": 5315,
-            "mean_predicted": 0.5486548507650145,
-            "observed_frequency": 0.4220131702728128
+            "count": 6762,
+            "mean_predicted": 0.5502316632536354,
+            "observed_frequency": 0.29488317065956815
           },
           {
             "bin_lower": 0.6000000000000001,
             "bin_upper": 0.7000000000000001,
-            "count": 4781,
-            "mean_predicted": 0.6492049305474347,
-            "observed_frequency": 0.5116084501150387
+            "count": 7570,
+            "mean_predicted": 0.6492390875468886,
+            "observed_frequency": 0.4060766182298547
           },
           {
             "bin_lower": 0.7000000000000001,
             "bin_upper": 0.8,
-            "count": 4110,
-            "mean_predicted": 0.7488525593958584,
-            "observed_frequency": 0.6321167883211679
+            "count": 6750,
+            "mean_predicted": 0.7492799913697507,
+            "observed_frequency": 0.4837037037037037
           },
           {
             "bin_lower": 0.8,
             "bin_upper": 0.9,
-            "count": 2834,
-            "mean_predicted": 0.8472323961744626,
-            "observed_frequency": 0.7657021877205363
+            "count": 5326,
+            "mean_predicted": 0.8460073121761871,
+            "observed_frequency": 0.6948929778445362
           },
           {
             "bin_lower": 0.9,
             "bin_upper": 1.0,
-            "count": 1468,
-            "mean_predicted": 0.9348914628476923,
-            "observed_frequency": 0.9318801089918256
+            "count": 1902,
+            "mean_predicted": 0.9252484569688576,
+            "observed_frequency": 0.8764458464773922
           }
         ],
         "beaten_by_baseline": [],
@@ -755,7 +755,7 @@
           "temperature",
           "spei_lag1m"
         ],
-        "threshold": 0.3696355473629375
+        "threshold": 0.5391382915479153
       },
       "spatial_holdout": {
         "skipped": false,
