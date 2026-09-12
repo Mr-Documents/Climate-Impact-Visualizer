@@ -179,6 +179,12 @@ const Dashboard = () => {
   const [droughtRisk, setDroughtRisk] = useState("N/A");
   const [floodScore, setFloodScore] = useState(0);
   const [droughtScore, setDroughtScore] = useState(0);
+  // Which engine produced the risk figures currently on screen: the trained
+  // classifiers, or the legacy rule if the ML service was unreachable. Shown to
+  // the user, because presenting a rule-based number as a model output is
+  // exactly the confusion this upgrade set out to remove.
+  const [riskSource, setRiskSource] = useState(null);
+  const [mlUnavailable, setMlUnavailable] = useState(false);
 
   const [alerts, setAlerts] = useState([]);
   const [validationError, setValidationError] = useState(null);
@@ -384,6 +390,7 @@ const Dashboard = () => {
         const results = await Promise.allSettled([
           axios.get(`${API_BASE}/weather?lat=${lat}&lon=${lon}`),
           axios.post(`${API_BASE}/predict`, { latitude: lat, longitude: lon }),
+          axios.post(`${API_BASE}/ml-risk`, { latitude: lat, longitude: lon }),
           axios.get(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`, { 
             headers: { 'User-Agent': 'ClimateImpactVisualizer/1.0' } 
           }).catch(() => null),
@@ -392,8 +399,9 @@ const Dashboard = () => {
 
         const weatherRes = results[0].status === 'fulfilled' ? results[0].value : null;
         const predictionRes = results[1].status === 'fulfilled' ? results[1].value : null;
-        const geoRes = results[2].status === 'fulfilled' ? results[2].value : null;
-        const histRes = results[3].status === 'fulfilled' ? results[3].value : null;
+        const mlRes = results[2].status === 'fulfilled' ? results[2].value : null;
+        const geoRes = results[3].status === 'fulfilled' ? results[3].value : null;
+        const histRes = results[4].status === 'fulfilled' ? results[4].value : null;
 
         if (!weatherRes || !predictionRes) throw new Error("Core climate services unavailable.");
 
@@ -498,11 +506,28 @@ const Dashboard = () => {
         }
 
         const predictionData = predictionRes.data?.prediction || {};
-        
-        let floodLabel = predictionData.flood?.label ?? "--";
-        let droughtLabel = predictionData.drought?.label ?? "--";
-        let floodSc = predictionData.flood?.score ?? 0;
-        let droughtSc = predictionData.drought?.score ?? 0;
+
+        // Prefer the trained classifiers. Their "score" is a calibrated
+        // probability, unlike the legacy rule's weighted index, so the two are
+        // never mixed - it is one source or the other, and the UI says which.
+        const ml = mlRes?.data;
+        let floodLabel, droughtLabel, floodSc, droughtSc;
+
+        if (ml?.flood && ml?.drought) {
+          floodLabel = ml.flood.band;
+          droughtLabel = ml.drought.band;
+          floodSc = ml.flood.probability;
+          droughtSc = ml.drought.probability;
+          setRiskSource("model");
+          setMlUnavailable(false);
+        } else {
+          floodLabel = predictionData.flood?.label ?? "--";
+          droughtLabel = predictionData.drought?.label ?? "--";
+          floodSc = predictionData.flood?.score ?? 0;
+          droughtSc = predictionData.drought?.score ?? 0;
+          setRiskSource("rule");
+          setMlUnavailable(true);
+        }
 
         if (isWater) {
           setLocationError("Selected location appears to be a water body or ice area. Soil-based predictions are invalid/unavailable.");
@@ -605,13 +630,19 @@ const Dashboard = () => {
       label: "Flood Risk Level",
       value: humanizeRisk(floodRisk),
       icon: <FaWater size={22} className="text-primary" />,
-      caption: "AI prediction",
+      // State the probability and which engine produced it. "AI prediction" on
+      // its own told the user nothing about provenance or confidence.
+      caption: riskSource === "model"
+        ? `${(floodScore * 100).toFixed(0)}% probability - trained model`
+        : (riskSource === "rule" ? "Rule-based fallback" : "AI prediction"),
     },
     {
       label: "Drought Severity",
       value: humanizeRisk(droughtRisk),
       icon: <FaCloudSun size={22} className="text-warning" />,
-      caption: "AI prediction",
+      caption: riskSource === "model"
+        ? `${(droughtScore * 100).toFixed(0)}% probability - trained model`
+        : (riskSource === "rule" ? "Rule-based fallback" : "AI prediction"),
     },
     {
       label: "Extreme Alerts",
@@ -619,7 +650,7 @@ const Dashboard = () => {
       icon: <FaExclamationTriangle size={22} className="text-danger" />,
       caption: "Real-time warnings",
     },
-  ], [currentWeather, floodRisk, droughtRisk, loading, alerts.length, isWaterBody]);
+  ], [currentWeather, floodRisk, droughtRisk, floodScore, droughtScore, riskSource, loading, alerts.length, isWaterBody]);
 
   // Memoize chart data to prevent canvas flicker and terminal warnings
   const chartLabels = useMemo(() => Array.from({ length: 24 }, (_, i) => {
@@ -703,6 +734,16 @@ const Dashboard = () => {
         {validationError && (
           <div className="alert alert-danger mt-3 mb-0 d-flex align-items-center gap-2">
             <FaExclamationTriangle /> <strong>Input Error:</strong> {validationError}
+          </div>
+        )}
+        {mlUnavailable && !loading && (
+          <div className="alert alert-warning mt-3 mb-0 d-flex align-items-start gap-2" role="status">
+            <FaExclamationTriangle className="mt-1 flex-shrink-0" />
+            <div className="small">
+              <strong>Showing rule-based estimates.</strong> The trained risk models
+              could not be reached, so these figures come from the fallback
+              calculation rather than the machine-learning service.
+            </div>
           </div>
         )}
         {locationError && (
