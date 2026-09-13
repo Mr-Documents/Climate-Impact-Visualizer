@@ -33,7 +33,26 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 
 import numpy as np
-from global_land_mask import globe
+
+
+def _globe():
+    """Import the land mask only when it is actually needed.
+
+    ``global_land_mask`` materialises a 21600x43200 boolean array - 933 MB
+    resident - at import time. Sampling needs it; nothing else does. But
+    ``openmeteo.py`` imports ``Location`` from this module, so a module-level
+    import put that 933 MB into the prediction service too, which OOM-killed the
+    512 MB deployment before it could bind a port. Inference never calls
+    ``is_land``: coordinates that are not land fail when the archive returns no
+    data for them.
+
+    Deferring the import keeps sampling unchanged and takes the service from
+    ~1166 MB to ~228 MB resident.
+    """
+    from global_land_mask import globe
+
+    return globe
+
 
 # Antarctica and the high Arctic are excluded: ERA5-Land carries no meaningful
 # soil moisture over permanent ice, and neither flood nor drought risk is a
@@ -94,6 +113,7 @@ def band_land_weights(probe_resolution_deg: float = 0.5) -> dict[tuple[float, fl
     """
     weights: dict[tuple[float, float], float] = {}
     lons = np.arange(-180.0, 180.0, probe_resolution_deg)
+    globe = _globe()  # resolved once, not per probe row
 
     for south, north in latitude_bands():
         lats = np.arange(south, north, probe_resolution_deg)
@@ -154,7 +174,7 @@ def _sample_band(
             )
         lat = float(rng.uniform(south, north))
         lon = float(rng.uniform(-180.0, 180.0))
-        if not bool(globe.is_land(lat, lon)):
+        if not bool(_globe().is_land(lat, lon)):
             continue
         if any(
             haversine_km(lat, lon, p.latitude, p.longitude) < MIN_SEPARATION_KM

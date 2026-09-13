@@ -133,10 +133,15 @@ to apply. Set `ML_SERVICE_URL` on the Node service to this service's address.
 
 | | |
 |---|---|
-| Memory | ~150–200 MB resident, fits the 512 MB free tier |
+| Memory | **262 MB peak** measured, fits the 512 MB free tier |
 | Models | 30.4 MB on disk |
 | TensorFlow | **not installed** — no candidate justified it |
 | Workers | 1 (each loads its own copy of both models) |
+
+**Do not import `global_land_mask` anywhere the service can reach.** It
+materialises a 933 MB boolean array at import time and OOM-killed the first
+deploy. `locations.py` defers it into `_globe()`; `tests/test_service_memory.py`
+enforces this.
 
 ---
 

@@ -27,12 +27,23 @@
 # Dockerfile would add a build step and an image to maintain without changing
 # the result. The dependency list is pure-wheel, so nothing needs compiling.
 #
-# MEMORY
-# The models total 30.4 MB on disk and load to roughly 150-200 MB resident with
-# pandas and scikit-learn. That fits the 512 MB free tier with headroom. It only
-# fits because the random forest is depth-capped: an unconstrained forest
-# produced 557 MB of artefacts and would not have deployed at all. No TensorFlow
-# is installed - no candidate model justified it.
+# MEMORY - measured, after an OOM in production
+# Peak 262 MB resident: ~178 MB for the import stack (pandas, scipy,
+# scikit-learn, fastapi), ~63 MB for the two models, ~20 MB for a request. That
+# fits the 512 MB free tier.
+#
+# The first deploy did NOT fit. It used 1166 MB and was OOM-killed before it
+# could bind a port ("No open ports detected", then "Out of memory (used over
+# 512Mi)"). The cause was not the models: locations.py imported
+# global_land_mask at module level, which materialises a 21600x43200 boolean
+# array - 933 MB - and openmeteo.py imports a dataclass from locations.py, so
+# the mask was pulled into the service transitively. The import is now deferred
+# into a function that only the sampling code calls, and
+# tests/test_service_memory.py fails if anything re-adds it.
+#
+# It also only fits because the random forest is depth-capped: an unconstrained
+# forest produced 557 MB of artefacts and would not have deployed at all. No
+# TensorFlow is installed - no candidate model justified it.
 
 services:
   - type: web
