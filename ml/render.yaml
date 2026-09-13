@@ -3,10 +3,24 @@
 # ARCHITECTURE
 #   React (Vercel) -> Node/Express (Render, public) -> this service (Render, internal)
 #
-# This service is NOT public. Express owns CORS, rate limiting and logging;
-# exposing Python directly would mean a second public origin and a second CORS
-# policy to keep in step, for no benefit. Set ML_SERVICE_URL on the Node service
-# to this service's internal address.
+# Express is the intended entry point: it owns CORS, rate limiting and logging,
+# and the frontend only ever calls Express. Set ML_SERVICE_URL on the Node
+# service to this service's address.
+#
+# CAVEAT - on Render's FREE plan this service is nonetheless publicly reachable.
+# Private Services are a paid feature, so `type: web, plan: free` gets a public
+# HTTPS URL whether or not anything links to it. Treat the URL as unlisted, not
+# private. It exposes no credentials and no write path - /predict takes a
+# latitude and longitude and returns two probabilities - so the exposure is
+# unauthenticated read of the same numbers Express already serves. To make it
+# genuinely private, move to a paid Private Service and use the internal address.
+#
+# COLD START - free instances spin down after ~15 minutes idle. The first
+# request after that pays Render's container boot (tens of seconds) on top of
+# this service's own ~4 s history fetch, which can exceed the Node side's
+# ML_TIMEOUT_MS (default 45000) and make the dashboard fall back to the rule
+# based path. Raise ML_TIMEOUT_MS, or accept the occasional first-request
+# fallback, or use a paid plan that does not sleep.
 #
 # WHY NO DOCKERFILE
 # Render's native Python runtime installs from requirements.txt directly. A

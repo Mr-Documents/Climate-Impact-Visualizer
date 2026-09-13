@@ -20,5 +20,5 @@ data/processed/*
 # ~47,000 weighted API calls - about 4.7 days against the free quota - so
 # committing it is what makes the pipeline reproducible by anyone marking it.
 #
-# models/ IS committed (46 MB). Training cannot run as a deployment build step
+# models/ IS committed (30 MB). Training cannot run as a deployment build step
 # for the same quota reason, so the service needs the artefacts in the repo.
