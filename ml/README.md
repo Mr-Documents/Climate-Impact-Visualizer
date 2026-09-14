@@ -123,6 +123,17 @@ of history (~783 weighted API calls). Results are cached per coordinate rounded
 to 2 dp (~1 km), so repeat requests are ~0.3 s. The free quota allows roughly
 12 new locations per day.
 
+**Serving window.** The service requests data up to **today** and predicts
+forward; training requests the frozen `START_DATE`-`END_DATE` window so results
+stay reproducible. This is safe because every fitted statistic (SPEI reference,
+R95p threshold, soil climatology) is masked by *year* against `TRAIN_END_YEAR`,
+so a longer record cannot move it - verified in `tests/test_serving_window.py`.
+
+> Two caveats worth knowing: the model reads only past observations, never a
+> weather forecast, so short-range NWP has information it does not; and all
+> reported metrics come from 2021-2024, so calibration is not re-verified for
+> the serving period. See MODEL_CARD.md section 14.
+
 ---
 
 ## Deployment
