@@ -1,0 +1,10 @@
+.logout-modal-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bs-danger);
+  background-color: rgba(220, 53, 69, 0.1);
+}

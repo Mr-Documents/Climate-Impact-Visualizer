@@ -29,8 +29,10 @@ import {
   FaChartLine,
   FaMapMarkedAlt,
   FaCloudSun,
-  FaShieldAlt
+  FaShieldAlt,
+  FaSignOutAlt
 } from "react-icons/fa";
+import { useAuth } from "../auth/authcontext";
 
 ChartJS.register(
   CategoryScale,
@@ -153,6 +155,7 @@ function MapOverlays({ center, layers }) {
 }
 
 const Dashboard = () => {
+  const { user, requestLogout } = useAuth();
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870, bounds: null });
   const [locationName, setLocationName] = useState("Accra, Ghana");
   const [loading, setLoading] = useState(true);
@@ -705,6 +708,21 @@ const Dashboard = () => {
                 <div className="small text-grey">Last refresh</div>
                 <div className="fw-semibold">{new Date().toLocaleTimeString()}</div>
               </div>
+              {user && (
+                <div className="bg-white bg-opacity-15 rounded-3 px-3 py-2 d-flex align-items-center gap-3">
+                  <div>
+                    <div className="small text-grey">Signed in as</div>
+                    <div className="fw-semibold">{user.fullName}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-2"
+                    onClick={requestLogout}
+                  >
+                    <FaSignOutAlt /> Log out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

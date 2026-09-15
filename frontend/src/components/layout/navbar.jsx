@@ -1,15 +1,9 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { FaSignOutAlt, FaUserCircle } from "react-icons/fa";
 import { useAuth } from "../../auth/authcontext";
 
 function Navbar() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const { user, requestLogout } = useAuth();
 
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-light px-3">
@@ -80,30 +74,21 @@ function Navbar() {
           </li>
 
           {user ? (
-            <li className="nav-item dropdown ms-lg-3">
+            <li className="nav-item d-flex flex-column flex-lg-row align-items-start align-items-lg-center gap-2 gap-lg-3 ms-lg-3 py-2 py-lg-0">
+              <span className="d-flex align-items-center gap-2 small">
+                <FaUserCircle size={24} className="text-primary flex-shrink-0" />
+                <span className="lh-sm">
+                  <span className="d-block fw-semibold text-dark">{user.fullName}</span>
+                  <span className="d-block text-muted">{user.email}</span>
+                </span>
+              </span>
               <button
-                className="nav-link dropdown-toggle btn btn-link text-decoration-none d-flex align-items-center gap-2"
                 type="button"
-                id="accountDropdown"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
+                className="btn btn-outline-danger btn-sm px-3 d-inline-flex align-items-center gap-2"
+                onClick={requestLogout}
               >
-                <FaUserCircle size={20} className="text-primary" />
-                {user.fullName}
+                <FaSignOutAlt /> Log out
               </button>
-              <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="accountDropdown">
-                <li>
-                  <span className="dropdown-item-text small text-muted">{user.email}</span>
-                </li>
-                <li>
-                  <hr className="dropdown-divider" />
-                </li>
-                <li>
-                  <button className="dropdown-item d-flex align-items-center gap-2" onClick={handleLogout}>
-                    <FaSignOutAlt /> Log out
-                  </button>
-                </li>
-              </ul>
             </li>
           ) : (
             <li className="nav-item d-flex flex-column flex-lg-row gap-2 ms-lg-3 py-2 py-lg-0">

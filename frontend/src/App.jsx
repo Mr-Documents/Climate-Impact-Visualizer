@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Navbar from "./components/layout/navbar";
 import Footer from "./components/layout/footer";
 import { AuthProvider } from "./auth/authcontext";
+import LogoutModal from "./components/auth/logoutmodal";
 
 import Dashboard from "./pages/dashboard";
 import MapPage from "./pages/map";
@@ -37,6 +38,9 @@ function AppLayout() {
       </Routes>
 
       {!isAuthPage && <Footer />}
+
+      {/* Shared logout confirmation, opened from any page via useAuth().requestLogout */}
+      <LogoutModal />
     </>
   );
 }
