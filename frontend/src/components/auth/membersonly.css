@@ -1,0 +1,27 @@
+.members-locked-compact {
+  background-color: rgba(13, 110, 253, 0.05);
+  border: 1px dashed rgba(13, 110, 253, 0.35);
+}
+
+.members-lock-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bs-primary);
+  background-color: rgba(13, 110, 253, 0.1);
+}
+
+.members-lock-icon-lg {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  font-size: 1.5rem;
+}
+
+.members-locked-text {
+  max-width: 460px;
+}

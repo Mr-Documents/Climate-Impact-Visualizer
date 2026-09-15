@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { FaEnvelope, FaExclamationCircle, FaUser } from "react-icons/fa";
 import AuthLayout from "../components/layout/authlayout";
 import { AuthField, PasswordField } from "../components/forms/authfields";
@@ -17,12 +17,15 @@ const initialForm = {
 function Signup() {
   const { user, signup } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Carried through to the login page so members return to the feature they wanted
+  const from = location.state?.from;
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [authError, setAuthError] = useState("");
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={from || "/"} replace />;
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -44,7 +47,7 @@ function Signup() {
       return;
     }
 
-    navigate("/login", { replace: true, state: { registeredEmail: result.user.email } });
+    navigate("/login", { replace: true, state: { registeredEmail: result.user.email, from } });
   };
 
   return (
@@ -54,7 +57,7 @@ function Signup() {
       footer={
         <>
           Already have an account?{" "}
-          <Link to="/login" className="fw-semibold text-decoration-none">
+          <Link to="/login" state={from ? { from } : undefined} className="fw-semibold text-decoration-none">
             Log in
           </Link>
         </>

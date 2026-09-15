@@ -12,12 +12,14 @@ function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const registeredEmail = location.state?.registeredEmail;
+  // Set when a guest was sent here from a members-only feature
+  const redirectTo = location.state?.from || "/";
 
   const [form, setForm] = useState({ email: registeredEmail || "", password: "" });
   const [errors, setErrors] = useState({});
   const [authError, setAuthError] = useState("");
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={redirectTo} replace />;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -26,7 +28,7 @@ function Login() {
     setAuthError("");
   };
 
-  const fillDemoAccount = () => {
+  const fillAdminAccount = () => {
     setForm({ email: DEFAULT_USER.email, password: DEFAULT_USER.password });
     setErrors({});
     setAuthError("");
@@ -45,7 +47,7 @@ function Login() {
       return;
     }
 
-    navigate("/", { replace: true });
+    navigate(redirectTo, { replace: true });
   };
 
   return (
@@ -55,7 +57,11 @@ function Login() {
       footer={
         <>
           Don't have an account?{" "}
-          <Link to="/signup" className="fw-semibold text-decoration-none">
+          <Link
+            to="/signup"
+            state={location.state?.from ? { from: location.state.from } : undefined}
+            className="fw-semibold text-decoration-none"
+          >
             Sign up
           </Link>
         </>
@@ -105,7 +111,7 @@ function Login() {
 
       <div className="auth-demo-box rounded-3 p-3 mt-4 small">
         <div className="d-flex align-items-center gap-2 fw-semibold mb-1">
-          <FaInfoCircle className="text-primary" /> Demo account
+          <FaInfoCircle className="text-primary" /> Admin account
         </div>
         <div className="text-muted text-break">
           {DEFAULT_USER.email} · {DEFAULT_USER.password}
@@ -113,9 +119,9 @@ function Login() {
         <button
           type="button"
           className="btn btn-link btn-sm p-0 mt-1 text-decoration-none"
-          onClick={fillDemoAccount}
+          onClick={fillAdminAccount}
         >
-          Use demo credentials
+          Use admin credentials
         </button>
       </div>
     </AuthLayout>

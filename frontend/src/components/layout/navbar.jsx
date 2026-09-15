@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FaSignOutAlt, FaUserCircle } from "react-icons/fa";
+import { FaLock, FaSignOutAlt, FaUserCircle } from "react-icons/fa";
 import { useAuth } from "../../auth/authcontext";
 
 function Navbar() {
@@ -55,13 +55,15 @@ function Navbar() {
             </button>
             <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="predictionsDropdown">
               <li>
-                <Link className="dropdown-item" to="/flood">
+                <Link className="dropdown-item d-flex align-items-center justify-content-between gap-3" to="/flood">
                   Flood Risk
+                  {!user && <FaLock size={11} className="text-muted" title="Members only" />}
                 </Link>
               </li>
               <li>
-                <Link className="dropdown-item" to="/drought">
+                <Link className="dropdown-item d-flex align-items-center justify-content-between gap-3" to="/drought">
                   Drought Risk
+                  {!user && <FaLock size={11} className="text-muted" title="Members only" />}
                 </Link>
               </li>
             </ul>

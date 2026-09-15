@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
 import CoordinateForm from "../components/forms/coordinateform";
@@ -30,9 +31,17 @@ import {
   FaMapMarkedAlt,
   FaCloudSun,
   FaShieldAlt,
-  FaSignOutAlt
+  FaStar,
+  FaRegStar,
+  FaTimes,
+  FaFilePdf,
+  FaLock,
+  FaTrashAlt,
+  FaUserClock
 } from "react-icons/fa";
 import { useAuth } from "../auth/authcontext";
+import MembersOnly, { LockedFeature } from "../components/auth/membersonly";
+import { generateClimateReport } from "../utils/pdfreport";
 
 ChartJS.register(
   CategoryScale,
@@ -155,7 +164,18 @@ function MapOverlays({ center, layers }) {
 }
 
 const Dashboard = () => {
-  const { user, requestLogout } = useAuth();
+  const {
+    user,
+    savedLocations,
+    isLocationSaved,
+    toggleSavedLocation,
+    removeSavedLocation,
+    searchHistory: mySearches,
+    recordSearch,
+    clearSearchHistory,
+  } = useAuth();
+  // null = follow the default (members see their own searches first)
+  const [activityTab, setActivityTab] = useState(null);
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870, bounds: null });
   const [locationName, setLocationName] = useState("Accra, Ghana");
   const [loading, setLoading] = useState(true);
@@ -222,6 +242,10 @@ const Dashboard = () => {
       console.error("Failed to fetch search history:", err);
     }
   }, []);
+
+  // Kept in a ref so logging in/out doesn't recreate fetchAllData and trigger a refetch
+  const recordSearchRef = useRef(recordSearch);
+  recordSearchRef.current = recordSearch;
 
   const dataSources = useMemo(
     () => [
@@ -547,6 +571,16 @@ const Dashboard = () => {
         setFloodScore(floodSc);
         setDroughtScore(droughtSc);
 
+        recordSearchRef.current({
+          source: "Dashboard",
+          name: englishName || backendName,
+          lat,
+          lon,
+          summary: isWater
+            ? "Water body"
+            : `Flood ${humanizeRisk(floodLabel)} · Drought ${humanizeRisk(droughtLabel)}`,
+        });
+
         // Real Prediction Data (Next 24 Hours)
         const projectedRain = futureSlice.map(s => Number(s.precipitation ?? 0));
         const projectedTemp = futureSlice.map(s => Number(s.temperature ?? 0));
@@ -689,6 +723,88 @@ const Dashboard = () => {
     }],
   }), [chartLabels, predictions.temperature]);
 
+  const infrastructureAdvice = floodRisk.toLowerCase() === "high"
+    ? "Prioritize clearing of drainage channels and secondary waterway inspection."
+    : "Schedule maintenance for water storage and irrigation distribution systems.";
+  const resourceAdvice = droughtRisk.toLowerCase() === "high"
+    ? "Activate emergency water conservation protocols and reservoir management."
+    : "Optimize energy grids for potential peak load fluctuations due to thermal shifts.";
+
+  /* ---------- Member features ---------- */
+
+  const shortLocationName = locationName.split(" (")[0].split(",")[0].trim() || "Selected location";
+  const currentLocationSaved = isLocationSaved(coords);
+  const activityView = activityTab ?? (user ? "mine" : "global");
+
+  const handleToggleSaved = () => {
+    toggleSavedLocation({ name: shortLocationName, lat: coords.lat, lon: coords.lon });
+  };
+
+  const describeRisk = (label, score) =>
+    riskSource === "model"
+      ? `${humanizeRisk(label)} (${(score * 100).toFixed(0)}% probability)`
+      : humanizeRisk(label);
+
+  const handleDownloadReport = () => {
+    const { rainfall, temperature } = predictions;
+    const slug = shortLocationName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+    generateClimateReport({
+      fileName: `climate-report-${slug}.pdf`,
+      title: "Climate Resilience Report",
+      preparedFor: `${user.fullName} (${user.email})`,
+      location: { name: locationName, lat: coords.lat, lon: coords.lon },
+      sections: [
+        {
+          title: "Risk Summary",
+          rows: [
+            ["Flood risk", describeRisk(floodRisk, floodScore)],
+            ["Drought severity", describeRisk(droughtRisk, droughtScore)],
+            [
+              "Heatwave potential",
+              currentWeather.heatwavePotential == null
+                ? "--"
+                : `${currentWeather.heatwaveStatus} (${currentWeather.heatwavePotential.toFixed(1)}%)`,
+            ],
+            ["Risk engine", riskSource === "model" ? "Trained ML model" : "Rule-based fallback"],
+            ["Model confidence", actionableScore],
+          ],
+        },
+        {
+          title: "Current Conditions",
+          rows: [
+            ["Average temperature (24h)", formatDegrees(currentWeather.temperature)],
+            ["Peak temperature (24h)", formatDegrees(currentWeather.maxTemp)],
+            ["Rainfall (last hour)", formatMillimeters(currentWeather.rainfallLastHour)],
+            ["Rainfall (24h)", formatMillimeters(currentWeather.rainfall24h)],
+            ["Humidity", currentWeather.humidity == null ? "--" : `${Math.round(currentWeather.humidity)}%`],
+            ["Soil moisture", formatPercent(currentWeather.soilMoisture)],
+          ],
+        },
+        {
+          title: "24-Hour Outlook",
+          rows: [
+            ["Expected rainfall", rainfall.length ? formatMillimeters(rainfall.reduce((sum, v) => sum + v, 0)) : "--"],
+            [
+              "Temperature range",
+              temperature.length
+                ? `${formatDegrees(Math.min(...temperature))} to ${formatDegrees(Math.max(...temperature))}`
+                : "--",
+            ],
+          ],
+        },
+        { title: "Recommended Actions", items: [infrastructureAdvice, resourceAdvice] },
+        {
+          title: "Active Alerts",
+          items: alerts.length
+            ? alerts.map((alert) => `${alert.type}: ${alert.message}`)
+            : ["No active alerts at this location."],
+        },
+        { title: "Data Sources", items: dataSources },
+      ],
+    });
+  };
+
   return (
     <div className="container py-4">
       <header className="dashboard-hero mb-4 rounded-4 overflow-hidden bg-light">
@@ -708,21 +824,6 @@ const Dashboard = () => {
                 <div className="small text-grey">Last refresh</div>
                 <div className="fw-semibold">{new Date().toLocaleTimeString()}</div>
               </div>
-              {user && (
-                <div className="bg-white bg-opacity-15 rounded-3 px-3 py-2 d-flex align-items-center gap-3">
-                  <div>
-                    <div className="small text-grey">Signed in as</div>
-                    <div className="fw-semibold">{user.fullName}</div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-2"
-                    onClick={requestLogout}
-                  >
-                    <FaSignOutAlt /> Log out
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -730,9 +831,22 @@ const Dashboard = () => {
 
       {/* Input & Validation Alerts Section */}
       <div className="card shadow-sm border-0 mb-4 p-3">
-        <h5 className="mb-3 fw-bold d-flex align-items-center gap-2">
-           <FaMapMarkedAlt className="text-primary" /> Update Location
-        </h5>
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <h5 className="mb-0 fw-bold d-flex align-items-center gap-2">
+            <FaMapMarkedAlt className="text-primary" /> Update Location
+          </h5>
+          {user && (
+            <button
+              type="button"
+              className={`btn btn-sm d-inline-flex align-items-center gap-2 ${currentLocationSaved ? "btn-light border" : "btn-outline-secondary"}`}
+              onClick={handleToggleSaved}
+              disabled={loading || isWaterBody}
+            >
+              {currentLocationSaved ? <FaStar className="text-warning" /> : <FaRegStar />}
+              {currentLocationSaved ? "Saved" : "Save location"}
+            </button>
+          )}
+        </div>
         <form onSubmit={handleLocationSearch} className="mb-3">
           <div className="input-group">
             <input 
@@ -752,6 +866,45 @@ const Dashboard = () => {
           buttonText="Analyze Location" 
           buttonColor="primary" 
         />
+        <div className="border-top mt-3 pt-3">
+          <div className="d-flex align-items-center gap-2 small fw-semibold text-secondary text-uppercase mb-2">
+            <FaStar className="text-warning" /> Saved Locations
+          </div>
+          <MembersOnly
+            compact
+            title="Save your favourite locations"
+            description="Log in to bookmark places and switch between them in one click."
+          >
+            {savedLocations.length === 0 ? (
+              <div className="text-muted small">
+                No saved locations yet. Analyze a place and click <strong>Save location</strong>.
+              </div>
+            ) : (
+              <div className="d-flex flex-wrap gap-2">
+                {savedLocations.map((loc) => (
+                  <div key={loc.id} className="btn-group btn-group-sm">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary d-inline-flex align-items-center gap-1"
+                      onClick={() => setCoords({ lat: loc.lat, lon: loc.lon, bounds: null })}
+                      title={`${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}`}
+                    >
+                      <FaMapMarkerAlt /> {loc.name}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      onClick={() => removeSavedLocation(loc.id)}
+                      aria-label={`Remove ${loc.name}`}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </MembersOnly>
+        </div>
         {validationError && (
           <div className="alert alert-danger mt-3 mb-0 d-flex align-items-center gap-2">
             <FaExclamationTriangle /> <strong>Input Error:</strong> {validationError}
@@ -803,9 +956,7 @@ const Dashboard = () => {
                       <div className="p-3 bg-light rounded-3 border-start border-4 border-primary">
                         <h6 className="fw-bold mb-1 small">Infrastructure Prep</h6>
                         <p className="small text-muted mb-0">
-                          {floodRisk.toLowerCase() === "high" 
-                            ? "Prioritize clearing of drainage channels and secondary waterway inspection." 
-                            : "Schedule maintenance for water storage and irrigation distribution systems."}
+                          {infrastructureAdvice}
                         </p>
                       </div>
                     </div>
@@ -813,9 +964,7 @@ const Dashboard = () => {
                       <div className="p-3 bg-light rounded-3 border-start border-4 border-success">
                         <h6 className="fw-bold mb-1 small">Resource Allocation</h6>
                         <p className="small text-muted mb-0">
-                          {droughtRisk.toLowerCase() === "high"
-                            ? "Activate emergency water conservation protocols and reservoir management."
-                            : "Optimize energy grids for potential peak load fluctuations due to thermal shifts."}
+                          {resourceAdvice}
                         </p>
                       </div>
                     </div>
@@ -836,9 +985,23 @@ const Dashboard = () => {
                   <h6 className="text-primary fw-bold text-uppercase small mb-3">Actionable Intelligence</h6>
                   <div className="display-6 fw-bold mb-2">{actionableScore}</div>
                   <p className="small mb-4 opacity-75">Model confidence in regional adaptation metrics based on multi-source sensor fusion.</p>
-                  <button className="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow" onClick={() => window.print()} disabled={isWaterBody}>
-                    Generate Resilience Report
-                  </button>
+                  {user ? (
+                    <button
+                      className="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow d-inline-flex align-items-center justify-content-center gap-2"
+                      onClick={handleDownloadReport}
+                      disabled={isWaterBody || loading}
+                    >
+                      <FaFilePdf /> Generate Resilience Report
+                    </button>
+                  ) : (
+                    <Link
+                      to="/login"
+                      state={{ from: "/" }}
+                      className="btn btn-outline-light w-100 rounded-pill fw-bold py-2 d-inline-flex align-items-center justify-content-center gap-2"
+                    >
+                      <FaLock /> Log in to generate report
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
@@ -987,11 +1150,70 @@ const Dashboard = () => {
             </div>
 
             <div className="card shadow-sm border-0 flex-grow-1">
-              <div className="card-header bg-white fw-bold py-3 d-flex align-items-center gap-2">
-                <FaHistory className="text-secondary" /> Recent Global Activity
+              <div className="card-header bg-white pt-2 pb-0">
+                <ul className="nav nav-tabs card-header-tabs small">
+                  {[
+                    { key: "mine", label: "My Searches", icon: <FaUserClock /> },
+                    { key: "global", label: "Global Activity", icon: <FaHistory /> },
+                  ].map((tab) => (
+                    <li key={tab.key} className="nav-item">
+                      <button
+                        type="button"
+                        className={`nav-link d-flex align-items-center gap-2 ${activityView === tab.key ? "active fw-semibold" : "text-secondary"}`}
+                        onClick={() => setActivityTab(tab.key)}
+                      >
+                        {tab.icon} {tab.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
               <div className="card-body p-0 overflow-auto" style={{ maxHeight: "300px" }}>
-                {searchHistory.length === 0 ? (
+                {activityView === "mine" ? (
+                  <MembersOnly
+                    compact
+                    className="m-3"
+                    title="Your personal search history"
+                    description="Log in to keep a record of the places you analyze."
+                  >
+                    {mySearches.length === 0 ? (
+                      <div className="p-3 text-muted small">You haven't analyzed any locations yet.</div>
+                    ) : (
+                      <>
+                        <div className="list-group list-group-flush">
+                          {mySearches.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className="list-group-item list-group-item-action border-0 py-2 px-3"
+                              onClick={() => setCoords({ lat: item.lat, lon: item.lon, bounds: null })}
+                            >
+                              <div className="d-flex justify-content-between align-items-center gap-2">
+                                <div className="text-truncate small fw-bold">{item.name}</div>
+                                <span className="badge bg-light text-dark border fw-normal flex-shrink-0">{item.source}</span>
+                              </div>
+                              <div className="d-flex justify-content-between gap-2 small text-muted">
+                                <span className="text-truncate">{item.summary}</span>
+                                <span className="flex-shrink-0">
+                                  {new Date(item.searchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="text-end px-3 py-2 border-top">
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm text-danger text-decoration-none p-0"
+                            onClick={clearSearchHistory}
+                          >
+                            <FaTrashAlt className="me-1" /> Clear history
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </MembersOnly>
+                ) : searchHistory.length === 0 ? (
                   <div className="p-3 text-muted small">No recent activity found.</div>
                 ) : (
                   <div className="list-group list-group-flush">
@@ -1241,41 +1463,59 @@ const Dashboard = () => {
         <div className="col-12">
           <div className="card shadow-sm border-0">
             <div className="card-body">
-              <div className="d-flex align-items-center justify-content-between mb-3">
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                 <div className="d-flex align-items-center gap-2 fw-bold">
                   <FaDatabase size={24} className="text-secondary" />
                   <span>Data Sources & Export</span>
                 </div>
-                <div className="d-flex gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-primary"
-                    onClick={() => {
-                      const payload = buildExportPayload();
-                      downloadFile("climate-dashboard-data.json", JSON.stringify(payload, null, 2), "application/json");
-                    }}
-                  >
-                    <FaDownload className="me-1" /> Export JSON
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    onClick={() => {
-                      const exportData = [
-                        { label: "Temperature", value: currentWeather.temperature },
-                        { label: "Rainfall 24h", value: currentWeather.rainfall24h },
-                        { label: "Soil Moisture", value: currentWeather.soilMoisture },
-                        { label: "Flood Risk", value: floodRisk },
-                        { label: "Drought Risk", value: droughtRisk },
-                      ];
-                      const csv = prepareCsv(exportData);
-                      downloadFile("climate-dashboard-data.csv", csv, "text/csv");
-                    }}
-                  >
-                    <FaDownload className="me-1" /> Export CSV
-                  </button>
-                </div>
+                {user && (
+                  <div className="d-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={handleDownloadReport}
+                      disabled={loading || isWaterBody}
+                    >
+                      <FaFilePdf className="me-1" /> PDF Report
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={() => {
+                        const payload = buildExportPayload();
+                        downloadFile("climate-dashboard-data.json", JSON.stringify(payload, null, 2), "application/json");
+                      }}
+                    >
+                      <FaDownload className="me-1" /> Export JSON
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary"
+                      onClick={() => {
+                        const exportData = [
+                          { label: "Temperature", value: currentWeather.temperature },
+                          { label: "Rainfall 24h", value: currentWeather.rainfall24h },
+                          { label: "Soil Moisture", value: currentWeather.soilMoisture },
+                          { label: "Flood Risk", value: floodRisk },
+                          { label: "Drought Risk", value: droughtRisk },
+                        ];
+                        const csv = prepareCsv(exportData);
+                        downloadFile("climate-dashboard-data.csv", csv, "text/csv");
+                      }}
+                    >
+                      <FaDownload className="me-1" /> Export CSV
+                    </button>
+                  </div>
+                )}
               </div>
+              {!user && (
+                <LockedFeature
+                  compact
+                  className="mb-3"
+                  title="Export data and download reports"
+                  description="Log in to download this analysis as a PDF report, CSV or JSON file."
+                />
+              )}
               <div className="row">
                 <div className="col-md-6">
                   <h6 className="mb-2 fw-semibold">Trusted sources</h6>
