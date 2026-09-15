@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FaChartLine, FaMapMarkedAlt, FaShieldAlt } from "react-icons/fa";
+import { FaArrowRight, FaChartLine, FaCompass, FaMapMarkedAlt, FaShieldAlt } from "react-icons/fa";
 import "./authlayout.css";
 
 const highlights = [
@@ -64,6 +64,24 @@ function AuthLayout({ title, subtitle, children, footer }) {
               <p className="text-muted mb-4">{subtitle}</p>
 
               {children}
+
+              {/* Guest access: explore the public dashboard without an account */}
+              <div className="auth-divider my-4">or</div>
+              <Link
+                to="/"
+                className="auth-explore d-flex align-items-center gap-3 p-3 rounded-3 text-decoration-none"
+              >
+                <span className="auth-explore-icon">
+                  <FaCompass />
+                </span>
+                <span className="flex-grow-1">
+                  <span className="d-block fw-semibold text-dark">Explore the dashboard</span>
+                  <span className="d-block small text-muted">
+                    Browse live climate data as a guest, no account needed.
+                  </span>
+                </span>
+                <FaArrowRight className="text-primary flex-shrink-0" />
+              </Link>
 
               {footer && <p className="text-center small text-muted mt-4 mb-0">{footer}</p>}
             </div>

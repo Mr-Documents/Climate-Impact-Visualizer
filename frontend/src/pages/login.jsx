@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { FaEnvelope, FaExclamationCircle, FaCheckCircle, FaInfoCircle } from "react-icons/fa";
+import { FaEnvelope, FaExclamationCircle, FaCheckCircle } from "react-icons/fa";
 import AuthLayout from "../components/layout/authlayout";
 import { AuthField, PasswordField } from "../components/forms/authfields";
 import { useAuth } from "../auth/authcontext";
-import { DEFAULT_USER } from "../auth/users";
 import { validateLogin } from "../auth/validation";
 
 function Login() {
@@ -25,12 +24,6 @@ function Login() {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: undefined }));
-    setAuthError("");
-  };
-
-  const fillAdminAccount = () => {
-    setForm({ email: DEFAULT_USER.email, password: DEFAULT_USER.password });
-    setErrors({});
     setAuthError("");
   };
 
@@ -108,22 +101,6 @@ function Login() {
           Log in
         </button>
       </form>
-
-      <div className="auth-demo-box rounded-3 p-3 mt-4 small">
-        <div className="d-flex align-items-center gap-2 fw-semibold mb-1">
-          <FaInfoCircle className="text-primary" /> Admin account
-        </div>
-        <div className="text-muted text-break">
-          {DEFAULT_USER.email} · {DEFAULT_USER.password}
-        </div>
-        <button
-          type="button"
-          className="btn btn-link btn-sm p-0 mt-1 text-decoration-none"
-          onClick={fillAdminAccount}
-        >
-          Use admin credentials
-        </button>
-      </div>
     </AuthLayout>
   );
 }

@@ -84,9 +84,47 @@
   border-color: var(--bs-form-invalid-border-color);
 }
 
-.auth-demo-box {
-  background-color: rgba(13, 110, 253, 0.06);
-  border: 1px dashed rgba(13, 110, 253, 0.35);
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #6c757d;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--bs-border-color);
+}
+
+.auth-explore {
+  border: 1px solid var(--bs-border-color);
+  background-color: #fff;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-explore:hover,
+.auth-explore:focus-visible {
+  border-color: rgba(13, 110, 253, 0.5);
+  background-color: rgba(13, 110, 253, 0.04);
+  box-shadow: 0 0.25rem 0.75rem rgba(12, 38, 54, 0.08);
+}
+
+.auth-explore-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  color: var(--bs-primary);
+  background-color: rgba(13, 110, 253, 0.1);
+  font-size: 1.1rem;
 }
 
 @media (min-width: 576px) {
