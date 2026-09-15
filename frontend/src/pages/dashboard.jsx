@@ -37,8 +37,12 @@ import {
   FaFilePdf,
   FaLock,
   FaTrashAlt,
-  FaUserClock
+  FaUserClock,
+  FaInfoCircle
 } from "react-icons/fa";
+import OverlayTrigger from "react-bootstrap/OverlayTrigger";
+// Renamed: chart.js's Tooltip is already imported in this file
+import BsTooltip from "react-bootstrap/Tooltip";
 import { useAuth } from "../auth/authcontext";
 import MembersOnly, { LockedFeature } from "../components/auth/membersonly";
 import { generateClimateReport } from "../utils/pdfreport";
@@ -54,14 +58,25 @@ ChartJS.register(
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
+// The ML service labels risk Low / Moderate / High / Very High, while the
+// rule-based fallback uses low / medium / high. Map both onto one scale so
+// colours, alerts and advice behave the same whichever engine answered.
+const riskLevel = (label) => {
+  const normalized = label?.toString().trim().toLowerCase();
+  if (normalized === "very high") return "veryHigh";
+  if (normalized === "high") return "high";
+  if (normalized === "moderate" || normalized === "medium") return "medium";
+  if (normalized === "low") return "low";
+  return null;
+};
+
+const isHighRisk = (label) => ["high", "veryHigh"].includes(riskLevel(label));
+
+// Keeps the engine's own wording, just title-cased ("very high" -> "Very High")
 const humanizeRisk = (label) => {
   if (label === "--") return "--";
   if (!label || label === "N/A") return "N/A";
-  const normalized = label.toString().toLowerCase();
-  if (normalized === "high") return "High";
-  if (normalized === "medium") return "Medium";
-  if (normalized === "low") return "Low";
-  return label;
+  return label.toString().toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 const getRiskColor = (risk) => {
@@ -79,9 +94,11 @@ const getRiskColor = (risk) => {
     return "#28a745";
   }
 
-  if (r === "high") return "#dc3545";
-  if (r === "medium") return "#ffc107";
-  if (r === "low") return "#28a745";
+  const level = riskLevel(r);
+  if (level === "veryHigh") return "#b02a37";
+  if (level === "high") return "#dc3545";
+  if (level === "medium") return "#ffc107";
+  if (level === "low") return "#28a745";
   return "#6c757d";
 };
 
@@ -323,7 +340,7 @@ const Dashboard = () => {
     (weather, floodLabel, droughtLabel, heatwaveLabel, currentThreshold) => {
       const newAlerts = [];
 
-      if (floodLabel?.toLowerCase?.() === "high") {
+      if (isHighRisk(floodLabel)) {
         newAlerts.push({
           type: "Flood",
           message: "Flood warning: heavy precipitation and saturated soils detected.",
@@ -331,7 +348,7 @@ const Dashboard = () => {
           timestamp: new Date().toISOString(),
         });
       }
-      if (droughtLabel?.toLowerCase?.() === "high") {
+      if (isHighRisk(droughtLabel)) {
         newAlerts.push({
           type: "Drought",
           message: "Drought alert: soil moisture is low while temperatures are high.",
@@ -670,8 +687,11 @@ const Dashboard = () => {
       // The flood model is calibrated (expected calibration error 0.011), so
       // its probability is meaningful and shown as a percentage.
       caption: riskSource === "model"
-        ? `${(floodScore * 100).toFixed(0)}% probability - trained model`
+        ? `${(floodScore * 100).toFixed(0)}% chance in the next 3 days`
         : (riskSource === "rule" ? "Rule-based fallback" : "AI prediction"),
+      info: riskSource === "model"
+        ? "The chance that very heavy rain falls on already-wet ground in the next 3 days, the conditions that usually lead to floods. It does not account for terrain, drainage or flood defences."
+        : null,
     },
     {
       label: "Drought Severity",
@@ -681,8 +701,11 @@ const Dashboard = () => {
       // a recent window (test ECE 0.111 -> 0.032). Before that the number was
       // withheld, because the model said 24% where the observed rate was 56%.
       caption: riskSource === "model"
-        ? `${(droughtScore * 100).toFixed(0)}% probability - trained model`
+        ? `${(droughtScore * 100).toFixed(0)}% chance within a month`
         : (riskSource === "rule" ? "Rule-based fallback" : "AI prediction"),
+      info: riskSource === "model"
+        ? "The chance this area is in a moderate drought or worse about one month from now, based on rainfall compared with evaporation over the last 3 months."
+        : null,
     },
     {
       label: "Extreme Alerts",
@@ -723,10 +746,10 @@ const Dashboard = () => {
     }],
   }), [chartLabels, predictions.temperature]);
 
-  const infrastructureAdvice = floodRisk.toLowerCase() === "high"
+  const infrastructureAdvice = isHighRisk(floodRisk)
     ? "Prioritize clearing of drainage channels and secondary waterway inspection."
     : "Schedule maintenance for water storage and irrigation distribution systems.";
-  const resourceAdvice = droughtRisk.toLowerCase() === "high"
+  const resourceAdvice = isHighRisk(droughtRisk)
     ? "Activate emergency water conservation protocols and reservoir management."
     : "Optimize energy grids for potential peak load fluctuations due to thermal shifts.";
 
@@ -1026,7 +1049,31 @@ const Dashboard = () => {
                   {card.icon}
                 </div>
                 <div>
-                  <div className="text-secondary small fw-semibold text-uppercase">{card.label}</div>
+                  <div className="text-secondary small fw-semibold text-uppercase d-flex align-items-center gap-1">
+                    {card.label}
+                    {card.info && (
+                      <OverlayTrigger
+                        placement="top"
+                        trigger={["hover", "focus"]}
+                        overlay={
+                          <BsTooltip id={`kpi-info-${card.label}`}>
+                            {card.info}
+                            <div className="mt-2 opacity-75">
+                              Low: under 25% · Moderate: 25–50% · High: 50–75% · Very High: 75%+
+                            </div>
+                          </BsTooltip>
+                        }
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-link p-0 border-0 d-inline-flex text-secondary"
+                          aria-label={`What does the ${card.label.toLowerCase()} percentage mean?`}
+                        >
+                          <FaInfoCircle size={13} />
+                        </button>
+                      </OverlayTrigger>
+                    )}
+                  </div>
                   <div className="fs-5 fw-bold">{card.value}</div>
                   <div className="text-muted small">{card.caption}</div>
                 </div>
@@ -1058,7 +1105,7 @@ const Dashboard = () => {
                     ? "--"
                     : isWaterBody 
                       ? "“Predictive models are optimized for terrestrial ecosystems. Analysis for maritime regions is currently constrained to atmospheric telemetry.”"
-                      : (floodRisk.toLowerCase() === "high" 
+                      : (isHighRisk(floodRisk) 
                           ? `“Rising rainfall variability combined with high humidity suggests increased flood likelihood in ${locationName.split(',')[0]}.”`
                           : `“This area shows high rainfall variability and ${droughtRisk.toLowerCase()} drought risk levels.”`)}
                 </p>
@@ -1067,14 +1114,14 @@ const Dashboard = () => {
                 <div className="col-md-6">
                   <div className="small fw-bold text-uppercase opacity-75 mb-2">Impact Summary</div>
                   <div className="d-flex justify-content-between border-bottom border-white border-opacity-10 py-1">
-                    <span>Flood Likelihood</span><span className="fw-bold">{floodRisk}</span>
+                    <span>Flood Likelihood</span><span className="fw-bold">{humanizeRisk(floodRisk)}</span>
                   </div>
                   <div className="d-flex justify-content-between border-bottom border-white border-opacity-10 py-1">
                     <span>Agricultural Impact</span>
                     <span className="fw-bold">
                       {loading ? '--' : 
-                       (droughtRisk.toLowerCase() === 'high' || (currentWeather.soilMoisture !== null && currentWeather.soilMoisture < 0.18)) ? 'Stressed' : 
-                       (droughtRisk.toLowerCase() === 'medium' ? 'Monitor' : 'Optimal')}
+                       (isHighRisk(droughtRisk) || (currentWeather.soilMoisture !== null && currentWeather.soilMoisture < 0.18)) ? 'Stressed' : 
+                       (riskLevel(droughtRisk) === 'medium' ? 'Monitor' : 'Optimal')}
                     </span>
                   </div>
                 </div>
