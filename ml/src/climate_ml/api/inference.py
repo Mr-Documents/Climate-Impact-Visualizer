@@ -25,6 +25,7 @@ exists to prevent.
 
 from __future__ import annotations
 
+import datetime as _dt
 import logging
 import threading
 from dataclasses import dataclass
@@ -91,7 +92,8 @@ class PredictionService:
     def __init__(self, models_dir: Path | None = None) -> None:
         self.models_dir = models_dir or config.MODELS_DIR
         self._bundles: dict[str, dict] = {}
-        self._history_cache: dict[tuple[float, float], pd.DataFrame] = {}
+        # Keyed by (rounded lat, rounded lon, ISO date) - see _fetch_history.
+        self._history_cache: dict[tuple[float, float, str], pd.DataFrame] = {}
         self._lock = threading.Lock()
         self._load_models()
 
@@ -131,15 +133,37 @@ class PredictionService:
     # --- data ---------------------------------------------------------------
 
     def _fetch_history(self, latitude: float, longitude: float) -> pd.DataFrame:
-        """Fetch (or reuse) the full daily record for one coordinate."""
-        key = (round(latitude, CACHE_PRECISION), round(longitude, CACHE_PRECISION))
+        """Fetch (or reuse) the daily record for one coordinate, up to today.
+
+        Training requests a fixed window ending at ``config.END_DATE`` so its
+        results stay reproducible. Serving must not: a prediction anchored to the
+        end of the training record is the same answer forever, which is what this
+        service used to return (every response said ``as_of 2024-12-31``).
+
+        Extending the window is safe because every fitted statistic is masked by
+        YEAR against ``TRAIN_END_YEAR``, not by "whatever record I was handed".
+        Measured on a real location: assembling a record truncated at 2020
+        against the full record through 2024 gives bit-identical values for all
+        29 features, ``spei_lag1m`` and ``r95p_mm``. Only the forward-looking
+        labels differ, on exactly the last 3 days (flood horizon) and last 30
+        days (drought horizon), and only by becoming defined where they had been
+        NaN. ``tests/test_serving_window.py`` keeps that true.
+        """
+        # UTC, not the server's local date: the archive request asks for
+        # timezone=UTC, and a Render instance in another zone would otherwise
+        # ask for a day the archive does not consider finished.
+        today = _dt.datetime.now(_dt.UTC).date().isoformat()
+        # The date is part of the key so a cached record is reused within a day
+        # and refetched the next, rather than pinning the service to whatever
+        # day it happened to start on.
+        key = (round(latitude, CACHE_PRECISION), round(longitude, CACHE_PRECISION), today)
         with self._lock:
             cached = self._history_cache.get(key)
         if cached is not None:
             return cached
 
         try:
-            payload = _request(latitude, longitude)
+            payload = _request(latitude, longitude, today)
         except RateLimitError as exc:
             raise UpstreamUnavailable(
                 "climate data provider quota exhausted; try again later"
@@ -166,8 +190,13 @@ class PredictionService:
             )
 
         with self._lock:
+            # Yesterday's entries for this coordinate are dead weight once the
+            # date rolls over; drop them rather than growing without bound.
+            stale = [k for k in self._history_cache if k[:2] == key[:2] and k != key]
+            for k in stale:
+                del self._history_cache[k]
             self._history_cache[key] = frame
-        logger.info("fetched %d days for %s", len(frame), key)
+        logger.info("fetched %d days for %s through %s", len(frame), key[:2], today)
         return frame
 
     # --- prediction ---------------------------------------------------------

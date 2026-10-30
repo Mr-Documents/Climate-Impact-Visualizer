@@ -27,6 +27,10 @@ and decision-support tool. Land coordinates between 60°S and 80°N.
 This is not a disaster warning service. It complements operational numerical
 weather prediction; it does not replace it.
 
+**The deployed API predicts from today, but was evaluated on 2021-2024.** The
+`as_of` field reports the last observation used. Read section 14 on what that
+does and does not guarantee.
+
 ---
 
 ## 2. Data
@@ -566,10 +570,83 @@ comparing metrics, not checksums.
    validation split and 6-fold grouped CV disagreed on the drought algorithm,
    and the difference on test was 9.8%. Reported results use grouped CV; a
    reader should treat any single-split comparison in this domain with caution.
+11. **The service runs outside its evaluated period.** Predictions are made
+   from the present day; every reported metric comes from 2021-2024. Given the
+   non-stationarity in §10, the calibration is the figure most likely to have
+   drifted. See section 14.
 
 ---
 
-## 14. References
+## 14. Serving window: predicting the present
+
+The service requests climate data up to **today** and predicts forward from it:
+flood over the next 3 days, drought about 30 days ahead. Training requests a
+fixed window ending at `config.END_DATE` so every result in this document stays
+reproducible.
+
+This was not always true. The first deployed version requested the training
+window at serving time too, so every response carried `as_of 2024-12-31` and a
+given coordinate returned the same answer forever.
+
+### Why extending the window is safe
+
+The concern is real: if extending the record refitted the SPEI reference
+distribution or the R95p threshold, the served model would score against a
+target quietly different from the evaluated one, and the calibration in §9 would
+no longer apply.
+
+It does not, because every fitted statistic is masked by **year**, not by
+"whatever record was supplied":
+
+```python
+split[years <= config.TRAIN_END_YEAR] = SPLIT_TRAIN
+monthly_train = month_periods.dt.year <= config.TRAIN_END_YEAR
+```
+
+Measured rather than assumed. Assembling one location's record truncated at
+2020-12-31, against the same location's full record through 2024-12-31:
+
+| Quantity | Result |
+|---|---|
+| All 29 model features | **bit-identical** |
+| `spei_lag1m`, `r95p_mm` | **bit-identical** |
+| `y_flood` | differs on exactly the last **3** days (its horizon) |
+| `y_drought` | differs on exactly the last **30** days (its horizon) |
+| Labels that *changed value* | **0** — every difference is NaN becoming defined |
+
+The tail differences are correct: a forward-looking label is undefined until the
+days it looks ahead to exist. Inference computes no labels at all.
+`tests/test_serving_window.py` asserts all of this, and was verified to fail
+when the year mask is replaced with a whole-record fit.
+
+### What this does not fix
+
+1. **The model never sees a weather forecast.** Every feature is a past
+   observation. The 3-day flood output says "the ground is primed and the recent
+   pattern is wet", not "rain is forecast on Tuesday". For short horizons a
+   numerical weather prediction model has information this one does not, and
+   should be expected to beat it. Drought at 30 days is where antecedent state
+   carries more weight than short-range NWP.
+2. **Serving now runs outside the evaluated period.** Every metric here comes
+   from 2021-2024. Predictions made in 2026 extrapolate two years beyond that.
+3. **Calibration is the figure most at risk.** §10 found drought 34-47% more
+   frequent in 2017-2024 than the 1995-2016 baseline implies, and the drought
+   model trains on 2012-2016 precisely to cope. Serving in 2026 is a decade past
+   that window, so the measured ECE of 0.0307 is **not re-verified for the
+   serving period**. Treat the probabilities as sound for ranking and
+   comparison; treat the exact percentage with more caution than §9 alone
+   suggests.
+4. **Recent days are preliminary.** The most recent entries come from ERA5T
+   rather than final ERA5 and are revised later. This is the same data
+   operational drought and flood monitors use, but a prediction made today may
+   not reproduce exactly once those days are finalised.
+
+The honest summary: the service predicts the present, and its ranking should
+hold. Its calibration was measured on a period that has since moved.
+
+---
+
+## 15. References
 
 - Vicente-Serrano, Beguería & López-Moreno (2010). *A Multiscalar Drought Index
   Sensitive to Global Warming: SPEI.* J. Climate 23, 1696–1718.

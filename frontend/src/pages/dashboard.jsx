@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import UnifiedMap from "../components/map/mapview";
 import CoordinateForm from "../components/forms/coordinateform";
@@ -29,8 +30,22 @@ import {
   FaChartLine,
   FaMapMarkedAlt,
   FaCloudSun,
-  FaShieldAlt
+  FaShieldAlt,
+  FaStar,
+  FaRegStar,
+  FaTimes,
+  FaFilePdf,
+  FaLock,
+  FaTrashAlt,
+  FaUserClock,
+  FaInfoCircle
 } from "react-icons/fa";
+import OverlayTrigger from "react-bootstrap/OverlayTrigger";
+// Renamed: chart.js's Tooltip is already imported in this file
+import BsTooltip from "react-bootstrap/Tooltip";
+import { useAuth } from "../auth/authcontext";
+import MembersOnly, { LockedFeature } from "../components/auth/membersonly";
+import { generateClimateReport } from "../utils/pdfreport";
 
 ChartJS.register(
   CategoryScale,
@@ -43,14 +58,25 @@ ChartJS.register(
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
+// The ML service labels risk Low / Moderate / High / Very High, while the
+// rule-based fallback uses low / medium / high. Map both onto one scale so
+// colours, alerts and advice behave the same whichever engine answered.
+const riskLevel = (label) => {
+  const normalized = label?.toString().trim().toLowerCase();
+  if (normalized === "very high") return "veryHigh";
+  if (normalized === "high") return "high";
+  if (normalized === "moderate" || normalized === "medium") return "medium";
+  if (normalized === "low") return "low";
+  return null;
+};
+
+const isHighRisk = (label) => ["high", "veryHigh"].includes(riskLevel(label));
+
+// Keeps the engine's own wording, just title-cased ("very high" -> "Very High")
 const humanizeRisk = (label) => {
   if (label === "--") return "--";
   if (!label || label === "N/A") return "N/A";
-  const normalized = label.toString().toLowerCase();
-  if (normalized === "high") return "High";
-  if (normalized === "medium") return "Medium";
-  if (normalized === "low") return "Low";
-  return label;
+  return label.toString().toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 const getRiskColor = (risk) => {
@@ -68,9 +94,11 @@ const getRiskColor = (risk) => {
     return "#28a745";
   }
 
-  if (r === "high") return "#dc3545";
-  if (r === "medium") return "#ffc107";
-  if (r === "low") return "#28a745";
+  const level = riskLevel(r);
+  if (level === "veryHigh") return "#b02a37";
+  if (level === "high") return "#dc3545";
+  if (level === "medium") return "#ffc107";
+  if (level === "low") return "#28a745";
   return "#6c757d";
 };
 
@@ -153,6 +181,18 @@ function MapOverlays({ center, layers }) {
 }
 
 const Dashboard = () => {
+  const {
+    user,
+    savedLocations,
+    isLocationSaved,
+    toggleSavedLocation,
+    removeSavedLocation,
+    searchHistory: mySearches,
+    recordSearch,
+    clearSearchHistory,
+  } = useAuth();
+  // null = follow the default (members see their own searches first)
+  const [activityTab, setActivityTab] = useState(null);
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870, bounds: null });
   const [locationName, setLocationName] = useState("Accra, Ghana");
   const [loading, setLoading] = useState(true);
@@ -219,6 +259,10 @@ const Dashboard = () => {
       console.error("Failed to fetch search history:", err);
     }
   }, []);
+
+  // Kept in a ref so logging in/out doesn't recreate fetchAllData and trigger a refetch
+  const recordSearchRef = useRef(recordSearch);
+  recordSearchRef.current = recordSearch;
 
   const dataSources = useMemo(
     () => [
@@ -296,7 +340,7 @@ const Dashboard = () => {
     (weather, floodLabel, droughtLabel, heatwaveLabel, currentThreshold) => {
       const newAlerts = [];
 
-      if (floodLabel?.toLowerCase?.() === "high") {
+      if (isHighRisk(floodLabel)) {
         newAlerts.push({
           type: "Flood",
           message: "Flood warning: heavy precipitation and saturated soils detected.",
@@ -304,7 +348,7 @@ const Dashboard = () => {
           timestamp: new Date().toISOString(),
         });
       }
-      if (droughtLabel?.toLowerCase?.() === "high") {
+      if (isHighRisk(droughtLabel)) {
         newAlerts.push({
           type: "Drought",
           message: "Drought alert: soil moisture is low while temperatures are high.",
@@ -544,6 +588,16 @@ const Dashboard = () => {
         setFloodScore(floodSc);
         setDroughtScore(droughtSc);
 
+        recordSearchRef.current({
+          source: "Dashboard",
+          name: englishName || backendName,
+          lat,
+          lon,
+          summary: isWater
+            ? "Water body"
+            : `Flood ${humanizeRisk(floodLabel)} · Drought ${humanizeRisk(droughtLabel)}`,
+        });
+
         // Real Prediction Data (Next 24 Hours)
         const projectedRain = futureSlice.map(s => Number(s.precipitation ?? 0));
         const projectedTemp = futureSlice.map(s => Number(s.temperature ?? 0));
@@ -633,8 +687,11 @@ const Dashboard = () => {
       // The flood model is calibrated (expected calibration error 0.011), so
       // its probability is meaningful and shown as a percentage.
       caption: riskSource === "model"
-        ? `${(floodScore * 100).toFixed(0)}% probability - trained model`
+        ? `${(floodScore * 100).toFixed(0)}% chance in the next 3 days`
         : (riskSource === "rule" ? "Rule-based fallback" : "AI prediction"),
+      info: riskSource === "model"
+        ? "The chance that very heavy rain falls on already-wet ground in the next 3 days, the conditions that usually lead to floods. It does not account for terrain, drainage or flood defences."
+        : null,
     },
     {
       label: "Drought Severity",
@@ -644,8 +701,11 @@ const Dashboard = () => {
       // a recent window (test ECE 0.111 -> 0.032). Before that the number was
       // withheld, because the model said 24% where the observed rate was 56%.
       caption: riskSource === "model"
-        ? `${(droughtScore * 100).toFixed(0)}% probability - trained model`
+        ? `${(droughtScore * 100).toFixed(0)}% chance within a month`
         : (riskSource === "rule" ? "Rule-based fallback" : "AI prediction"),
+      info: riskSource === "model"
+        ? "The chance this area is in a moderate drought or worse about one month from now, based on rainfall compared with evaporation over the last 3 months."
+        : null,
     },
     {
       label: "Extreme Alerts",
@@ -686,6 +746,88 @@ const Dashboard = () => {
     }],
   }), [chartLabels, predictions.temperature]);
 
+  const infrastructureAdvice = isHighRisk(floodRisk)
+    ? "Prioritize clearing of drainage channels and secondary waterway inspection."
+    : "Schedule maintenance for water storage and irrigation distribution systems.";
+  const resourceAdvice = isHighRisk(droughtRisk)
+    ? "Activate emergency water conservation protocols and reservoir management."
+    : "Optimize energy grids for potential peak load fluctuations due to thermal shifts.";
+
+  /* ---------- Member features ---------- */
+
+  const shortLocationName = locationName.split(" (")[0].split(",")[0].trim() || "Selected location";
+  const currentLocationSaved = isLocationSaved(coords);
+  const activityView = activityTab ?? (user ? "mine" : "global");
+
+  const handleToggleSaved = () => {
+    toggleSavedLocation({ name: shortLocationName, lat: coords.lat, lon: coords.lon });
+  };
+
+  const describeRisk = (label, score) =>
+    riskSource === "model"
+      ? `${humanizeRisk(label)} (${(score * 100).toFixed(0)}% probability)`
+      : humanizeRisk(label);
+
+  const handleDownloadReport = () => {
+    const { rainfall, temperature } = predictions;
+    const slug = shortLocationName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+    generateClimateReport({
+      fileName: `climate-report-${slug}.pdf`,
+      title: "Climate Resilience Report",
+      preparedFor: `${user.fullName} (${user.email})`,
+      location: { name: locationName, lat: coords.lat, lon: coords.lon },
+      sections: [
+        {
+          title: "Risk Summary",
+          rows: [
+            ["Flood risk", describeRisk(floodRisk, floodScore)],
+            ["Drought severity", describeRisk(droughtRisk, droughtScore)],
+            [
+              "Heatwave potential",
+              currentWeather.heatwavePotential == null
+                ? "--"
+                : `${currentWeather.heatwaveStatus} (${currentWeather.heatwavePotential.toFixed(1)}%)`,
+            ],
+            ["Risk engine", riskSource === "model" ? "Trained ML model" : "Rule-based fallback"],
+            ["Model confidence", actionableScore],
+          ],
+        },
+        {
+          title: "Current Conditions",
+          rows: [
+            ["Average temperature (24h)", formatDegrees(currentWeather.temperature)],
+            ["Peak temperature (24h)", formatDegrees(currentWeather.maxTemp)],
+            ["Rainfall (last hour)", formatMillimeters(currentWeather.rainfallLastHour)],
+            ["Rainfall (24h)", formatMillimeters(currentWeather.rainfall24h)],
+            ["Humidity", currentWeather.humidity == null ? "--" : `${Math.round(currentWeather.humidity)}%`],
+            ["Soil moisture", formatPercent(currentWeather.soilMoisture)],
+          ],
+        },
+        {
+          title: "24-Hour Outlook",
+          rows: [
+            ["Expected rainfall", rainfall.length ? formatMillimeters(rainfall.reduce((sum, v) => sum + v, 0)) : "--"],
+            [
+              "Temperature range",
+              temperature.length
+                ? `${formatDegrees(Math.min(...temperature))} to ${formatDegrees(Math.max(...temperature))}`
+                : "--",
+            ],
+          ],
+        },
+        { title: "Recommended Actions", items: [infrastructureAdvice, resourceAdvice] },
+        {
+          title: "Active Alerts",
+          items: alerts.length
+            ? alerts.map((alert) => `${alert.type}: ${alert.message}`)
+            : ["No active alerts at this location."],
+        },
+        { title: "Data Sources", items: dataSources },
+      ],
+    });
+  };
+
   return (
     <div className="container py-4">
       <header className="dashboard-hero mb-4 rounded-4 overflow-hidden bg-light">
@@ -712,9 +854,22 @@ const Dashboard = () => {
 
       {/* Input & Validation Alerts Section */}
       <div className="card shadow-sm border-0 mb-4 p-3">
-        <h5 className="mb-3 fw-bold d-flex align-items-center gap-2">
-           <FaMapMarkedAlt className="text-primary" /> Update Location
-        </h5>
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <h5 className="mb-0 fw-bold d-flex align-items-center gap-2">
+            <FaMapMarkedAlt className="text-primary" /> Update Location
+          </h5>
+          {user && (
+            <button
+              type="button"
+              className={`btn btn-sm d-inline-flex align-items-center gap-2 ${currentLocationSaved ? "btn-light border" : "btn-outline-secondary"}`}
+              onClick={handleToggleSaved}
+              disabled={loading || isWaterBody}
+            >
+              {currentLocationSaved ? <FaStar className="text-warning" /> : <FaRegStar />}
+              {currentLocationSaved ? "Saved" : "Save location"}
+            </button>
+          )}
+        </div>
         <form onSubmit={handleLocationSearch} className="mb-3">
           <div className="input-group">
             <input 
@@ -734,6 +889,45 @@ const Dashboard = () => {
           buttonText="Analyze Location" 
           buttonColor="primary" 
         />
+        <div className="border-top mt-3 pt-3">
+          <div className="d-flex align-items-center gap-2 small fw-semibold text-secondary text-uppercase mb-2">
+            <FaStar className="text-warning" /> Saved Locations
+          </div>
+          <MembersOnly
+            compact
+            title="Save your favourite locations"
+            description="Log in to bookmark places and switch between them in one click."
+          >
+            {savedLocations.length === 0 ? (
+              <div className="text-muted small">
+                No saved locations yet. Analyze a place and click <strong>Save location</strong>.
+              </div>
+            ) : (
+              <div className="d-flex flex-wrap gap-2">
+                {savedLocations.map((loc) => (
+                  <div key={loc.id} className="btn-group btn-group-sm">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary d-inline-flex align-items-center gap-1"
+                      onClick={() => setCoords({ lat: loc.lat, lon: loc.lon, bounds: null })}
+                      title={`${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}`}
+                    >
+                      <FaMapMarkerAlt /> {loc.name}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      onClick={() => removeSavedLocation(loc.id)}
+                      aria-label={`Remove ${loc.name}`}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </MembersOnly>
+        </div>
         {validationError && (
           <div className="alert alert-danger mt-3 mb-0 d-flex align-items-center gap-2">
             <FaExclamationTriangle /> <strong>Input Error:</strong> {validationError}
@@ -785,9 +979,7 @@ const Dashboard = () => {
                       <div className="p-3 bg-light rounded-3 border-start border-4 border-primary">
                         <h6 className="fw-bold mb-1 small">Infrastructure Prep</h6>
                         <p className="small text-muted mb-0">
-                          {floodRisk.toLowerCase() === "high" 
-                            ? "Prioritize clearing of drainage channels and secondary waterway inspection." 
-                            : "Schedule maintenance for water storage and irrigation distribution systems."}
+                          {infrastructureAdvice}
                         </p>
                       </div>
                     </div>
@@ -795,9 +987,7 @@ const Dashboard = () => {
                       <div className="p-3 bg-light rounded-3 border-start border-4 border-success">
                         <h6 className="fw-bold mb-1 small">Resource Allocation</h6>
                         <p className="small text-muted mb-0">
-                          {droughtRisk.toLowerCase() === "high"
-                            ? "Activate emergency water conservation protocols and reservoir management."
-                            : "Optimize energy grids for potential peak load fluctuations due to thermal shifts."}
+                          {resourceAdvice}
                         </p>
                       </div>
                     </div>
@@ -818,9 +1008,23 @@ const Dashboard = () => {
                   <h6 className="text-primary fw-bold text-uppercase small mb-3">Actionable Intelligence</h6>
                   <div className="display-6 fw-bold mb-2">{actionableScore}</div>
                   <p className="small mb-4 opacity-75">Model confidence in regional adaptation metrics based on multi-source sensor fusion.</p>
-                  <button className="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow" onClick={() => window.print()} disabled={isWaterBody}>
-                    Generate Resilience Report
-                  </button>
+                  {user ? (
+                    <button
+                      className="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow d-inline-flex align-items-center justify-content-center gap-2"
+                      onClick={handleDownloadReport}
+                      disabled={isWaterBody || loading}
+                    >
+                      <FaFilePdf /> Generate Resilience Report
+                    </button>
+                  ) : (
+                    <Link
+                      to="/login"
+                      state={{ from: "/" }}
+                      className="btn btn-outline-light w-100 rounded-pill fw-bold py-2 d-inline-flex align-items-center justify-content-center gap-2"
+                    >
+                      <FaLock /> Log in to generate report
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
@@ -845,7 +1049,31 @@ const Dashboard = () => {
                   {card.icon}
                 </div>
                 <div>
-                  <div className="text-secondary small fw-semibold text-uppercase">{card.label}</div>
+                  <div className="text-secondary small fw-semibold text-uppercase d-flex align-items-center gap-1">
+                    {card.label}
+                    {card.info && (
+                      <OverlayTrigger
+                        placement="top"
+                        trigger={["hover", "focus"]}
+                        overlay={
+                          <BsTooltip id={`kpi-info-${card.label}`}>
+                            {card.info}
+                            <div className="mt-2 opacity-75">
+                              Low: under 25% · Moderate: 25–50% · High: 50–75% · Very High: 75%+
+                            </div>
+                          </BsTooltip>
+                        }
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-link p-0 border-0 d-inline-flex text-secondary"
+                          aria-label={`What does the ${card.label.toLowerCase()} percentage mean?`}
+                        >
+                          <FaInfoCircle size={13} />
+                        </button>
+                      </OverlayTrigger>
+                    )}
+                  </div>
                   <div className="fs-5 fw-bold">{card.value}</div>
                   <div className="text-muted small">{card.caption}</div>
                 </div>
@@ -877,7 +1105,7 @@ const Dashboard = () => {
                     ? "--"
                     : isWaterBody 
                       ? "“Predictive models are optimized for terrestrial ecosystems. Analysis for maritime regions is currently constrained to atmospheric telemetry.”"
-                      : (floodRisk.toLowerCase() === "high" 
+                      : (isHighRisk(floodRisk) 
                           ? `“Rising rainfall variability combined with high humidity suggests increased flood likelihood in ${locationName.split(',')[0]}.”`
                           : `“This area shows high rainfall variability and ${droughtRisk.toLowerCase()} drought risk levels.”`)}
                 </p>
@@ -886,14 +1114,14 @@ const Dashboard = () => {
                 <div className="col-md-6">
                   <div className="small fw-bold text-uppercase opacity-75 mb-2">Impact Summary</div>
                   <div className="d-flex justify-content-between border-bottom border-white border-opacity-10 py-1">
-                    <span>Flood Likelihood</span><span className="fw-bold">{floodRisk}</span>
+                    <span>Flood Likelihood</span><span className="fw-bold">{humanizeRisk(floodRisk)}</span>
                   </div>
                   <div className="d-flex justify-content-between border-bottom border-white border-opacity-10 py-1">
                     <span>Agricultural Impact</span>
                     <span className="fw-bold">
                       {loading ? '--' : 
-                       (droughtRisk.toLowerCase() === 'high' || (currentWeather.soilMoisture !== null && currentWeather.soilMoisture < 0.18)) ? 'Stressed' : 
-                       (droughtRisk.toLowerCase() === 'medium' ? 'Monitor' : 'Optimal')}
+                       (isHighRisk(droughtRisk) || (currentWeather.soilMoisture !== null && currentWeather.soilMoisture < 0.18)) ? 'Stressed' : 
+                       (riskLevel(droughtRisk) === 'medium' ? 'Monitor' : 'Optimal')}
                     </span>
                   </div>
                 </div>
@@ -969,11 +1197,70 @@ const Dashboard = () => {
             </div>
 
             <div className="card shadow-sm border-0 flex-grow-1">
-              <div className="card-header bg-white fw-bold py-3 d-flex align-items-center gap-2">
-                <FaHistory className="text-secondary" /> Recent Global Activity
+              <div className="card-header bg-white pt-2 pb-0">
+                <ul className="nav nav-tabs card-header-tabs small">
+                  {[
+                    { key: "mine", label: "My Searches", icon: <FaUserClock /> },
+                    { key: "global", label: "Global Activity", icon: <FaHistory /> },
+                  ].map((tab) => (
+                    <li key={tab.key} className="nav-item">
+                      <button
+                        type="button"
+                        className={`nav-link d-flex align-items-center gap-2 ${activityView === tab.key ? "active fw-semibold" : "text-secondary"}`}
+                        onClick={() => setActivityTab(tab.key)}
+                      >
+                        {tab.icon} {tab.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
               <div className="card-body p-0 overflow-auto" style={{ maxHeight: "300px" }}>
-                {searchHistory.length === 0 ? (
+                {activityView === "mine" ? (
+                  <MembersOnly
+                    compact
+                    className="m-3"
+                    title="Your personal search history"
+                    description="Log in to keep a record of the places you analyze."
+                  >
+                    {mySearches.length === 0 ? (
+                      <div className="p-3 text-muted small">You haven't analyzed any locations yet.</div>
+                    ) : (
+                      <>
+                        <div className="list-group list-group-flush">
+                          {mySearches.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className="list-group-item list-group-item-action border-0 py-2 px-3"
+                              onClick={() => setCoords({ lat: item.lat, lon: item.lon, bounds: null })}
+                            >
+                              <div className="d-flex justify-content-between align-items-center gap-2">
+                                <div className="text-truncate small fw-bold">{item.name}</div>
+                                <span className="badge bg-light text-dark border fw-normal flex-shrink-0">{item.source}</span>
+                              </div>
+                              <div className="d-flex justify-content-between gap-2 small text-muted">
+                                <span className="text-truncate">{item.summary}</span>
+                                <span className="flex-shrink-0">
+                                  {new Date(item.searchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="text-end px-3 py-2 border-top">
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm text-danger text-decoration-none p-0"
+                            onClick={clearSearchHistory}
+                          >
+                            <FaTrashAlt className="me-1" /> Clear history
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </MembersOnly>
+                ) : searchHistory.length === 0 ? (
                   <div className="p-3 text-muted small">No recent activity found.</div>
                 ) : (
                   <div className="list-group list-group-flush">
@@ -1223,41 +1510,59 @@ const Dashboard = () => {
         <div className="col-12">
           <div className="card shadow-sm border-0">
             <div className="card-body">
-              <div className="d-flex align-items-center justify-content-between mb-3">
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                 <div className="d-flex align-items-center gap-2 fw-bold">
                   <FaDatabase size={24} className="text-secondary" />
                   <span>Data Sources & Export</span>
                 </div>
-                <div className="d-flex gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-primary"
-                    onClick={() => {
-                      const payload = buildExportPayload();
-                      downloadFile("climate-dashboard-data.json", JSON.stringify(payload, null, 2), "application/json");
-                    }}
-                  >
-                    <FaDownload className="me-1" /> Export JSON
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    onClick={() => {
-                      const exportData = [
-                        { label: "Temperature", value: currentWeather.temperature },
-                        { label: "Rainfall 24h", value: currentWeather.rainfall24h },
-                        { label: "Soil Moisture", value: currentWeather.soilMoisture },
-                        { label: "Flood Risk", value: floodRisk },
-                        { label: "Drought Risk", value: droughtRisk },
-                      ];
-                      const csv = prepareCsv(exportData);
-                      downloadFile("climate-dashboard-data.csv", csv, "text/csv");
-                    }}
-                  >
-                    <FaDownload className="me-1" /> Export CSV
-                  </button>
-                </div>
+                {user && (
+                  <div className="d-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={handleDownloadReport}
+                      disabled={loading || isWaterBody}
+                    >
+                      <FaFilePdf className="me-1" /> PDF Report
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={() => {
+                        const payload = buildExportPayload();
+                        downloadFile("climate-dashboard-data.json", JSON.stringify(payload, null, 2), "application/json");
+                      }}
+                    >
+                      <FaDownload className="me-1" /> Export JSON
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary"
+                      onClick={() => {
+                        const exportData = [
+                          { label: "Temperature", value: currentWeather.temperature },
+                          { label: "Rainfall 24h", value: currentWeather.rainfall24h },
+                          { label: "Soil Moisture", value: currentWeather.soilMoisture },
+                          { label: "Flood Risk", value: floodRisk },
+                          { label: "Drought Risk", value: droughtRisk },
+                        ];
+                        const csv = prepareCsv(exportData);
+                        downloadFile("climate-dashboard-data.csv", csv, "text/csv");
+                      }}
+                    >
+                      <FaDownload className="me-1" /> Export CSV
+                    </button>
+                  </div>
+                )}
               </div>
+              {!user && (
+                <LockedFeature
+                  compact
+                  className="mb-3"
+                  title="Export data and download reports"
+                  description="Log in to download this analysis as a PDF report, CSV or JSON file."
+                />
+              )}
               <div className="row">
                 <div className="col-md-6">
                   <h6 className="mb-2 fw-semibold">Trusted sources</h6>

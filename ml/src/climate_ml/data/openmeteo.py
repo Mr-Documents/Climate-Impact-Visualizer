@@ -72,13 +72,24 @@ def cache_path(location_id: str) -> Path:
     return config.RAW_DIR / f"{location_id}.parquet"
 
 
-def _request(latitude: float, longitude: float) -> dict:
-    """Fetch one location with bounded retries and exponential backoff."""
+def _request(latitude: float, longitude: float, end_date: str | None = None) -> dict:
+    """Fetch one location with bounded retries and exponential backoff.
+
+    Args:
+        end_date: Last day to request, ``YYYY-MM-DD``. Defaults to
+            ``config.END_DATE``, which is what TRAINING must always use so the
+            committed results stay reproducible. The prediction service passes
+            today instead - see ``api/inference.py``. Every statistic that gets
+            fitted (the SPEI distribution, the R95p threshold, the day-of-year
+            soil climatology) is masked by YEAR against ``TRAIN_END_YEAR`` in
+            ``assemble.py``, so extending the record cannot move them; this is
+            asserted in ``tests/test_serving_window.py``.
+    """
     params = {
         "latitude": latitude,
         "longitude": longitude,
         "start_date": config.START_DATE,
-        "end_date": config.END_DATE,
+        "end_date": end_date or config.END_DATE,
         "daily": ",".join(config.DAILY_VARIABLES),
         "timezone": "UTC",
     }
@@ -126,14 +137,14 @@ def _request(latitude: float, longitude: float) -> dict:
     raise TransientError(message) if last_was_transient else AcquisitionError(message)
 
 
-def _validate(frame: pd.DataFrame, location_id: str) -> None:
+def _validate(frame: pd.DataFrame, location_id: str, end_date: str | None = None) -> None:
     """Reject structurally unusable responses rather than training on them."""
     missing = [v for v in config.DAILY_VARIABLES if v not in frame.columns]
     if missing:
         raise AcquisitionError(f"{location_id}: response omitted {missing}")
 
     expected_start = pd.Timestamp(config.START_DATE)
-    expected_end = pd.Timestamp(config.END_DATE)
+    expected_end = pd.Timestamp(end_date or config.END_DATE)
     if frame["date"].min() != expected_start or frame["date"].max() != expected_end:
         raise AcquisitionError(
             f"{location_id}: date axis {frame['date'].min().date()}..{frame['date'].max().date()} "
@@ -151,7 +162,9 @@ def _validate(frame: pd.DataFrame, location_id: str) -> None:
             raise AcquisitionError(f"{location_id}: '{variable}' is entirely null")
 
 
-def fetch_location(location: Location, *, force: bool = False) -> FetchResult:
+def fetch_location(
+    location: Location, *, force: bool = False, end_date: str | None = None
+) -> FetchResult:
     """Download one location, or return the cached copy if present."""
     path = cache_path(location.location_id)
     if path.exists() and not force:
@@ -164,13 +177,13 @@ def fetch_location(location: Location, *, force: bool = False) -> FetchResult:
             from_cache=True,
         )
 
-    payload = _request(location.latitude, location.longitude)
+    payload = _request(location.latitude, location.longitude, end_date)
     daily = payload["daily"]
 
     frame = pd.DataFrame(daily)
     frame = frame.rename(columns={"time": "date"})
     frame["date"] = pd.to_datetime(frame["date"])
-    _validate(frame, location.location_id)
+    _validate(frame, location.location_id, end_date)
 
     # Carry the identifying context on every row so per-location files can be
     # concatenated without losing which point they describe.

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useAuth } from "../auth/authcontext";
 import CoordinateForm from "../components/forms/coordinateform";
 import UnifiedMap from "../components/map/mapview";
 import WeatherIcon from "../components/ui/weathericon";
@@ -31,6 +32,7 @@ ChartJS.register(
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
 const FloodRiskPage = () => {
+  const { recordSearch } = useAuth();
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870, bounds: null });
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
@@ -81,6 +83,16 @@ const FloodRiskPage = () => {
       } else {
         setLocationName(backendName);
       }
+
+      recordSearch({
+        source: "Flood Risk",
+        name: englishName || backendName,
+        lat,
+        lon,
+        summary: response.data?.isWater
+          ? "Water body"
+          : `Flood risk: ${response.data?.prediction?.flood?.label ?? "--"}`,
+      });
 
       // 2. Check for Water Body
       if (response.data?.isWater) {
