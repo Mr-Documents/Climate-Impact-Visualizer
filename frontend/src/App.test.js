@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+test('renders the climate dashboard without authentication actions', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /at a glance/i })).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /log in|sign up/i })).not.toBeInTheDocument();
 });

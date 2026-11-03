@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import ReactDOMServer from "react-dom/server";
 import CoordinateForm from "../components/forms/coordinateform";
 import UnifiedMap from "../components/map/mapview";
-import { LockedFeature } from "../components/auth/membersonly";
-import { useAuth } from "../auth/authcontext";
 import axios from "axios";
 import {
     FaMapMarkedAlt,
@@ -94,7 +92,6 @@ const weatherLayers = {
 const MapPage = () => {
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870 });
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [data, setData] = useState({
     weather: null,
@@ -200,11 +197,9 @@ const MapPage = () => {
     fetchLocationName(coords.lat, coords.lon);
   }, [coords.lat, coords.lon, fetchAllClimateData, fetchLocationName]);
 
-  // Long-term history is members-only, so guests don't trigger the heavy multi-decade request
   useEffect(() => {
-    if (!user) return;
     fetchHistoricalDeepDive(coords.lat, coords.lon, startYear);
-  }, [user, coords.lat, coords.lon, startYear, fetchHistoricalDeepDive]);
+  }, [coords.lat, coords.lon, startYear, fetchHistoricalDeepDive]);
 
   const toggleOverlay = (key) => {
     setActiveOverlays((prev) => 
@@ -599,21 +594,8 @@ const MapPage = () => {
         </div>
       </div>
 
-      {/* DEEP HISTORICAL ANALYSIS SECTION (members only) */}
+      {/* DEEP HISTORICAL ANALYSIS SECTION */}
       <div className="col-12 mt-4">
-        {!user ? (
-          <div className="card shadow-sm border-0 rounded-4">
-            <LockedFeature
-              title="30-Year Climate Evolution"
-              description="Log in to explore decades of climate history for any location."
-              perks={[
-                "Long-term warming trends and rainfall anomalies",
-                "Extreme heat and heavy-rainfall event analysis",
-                "Seasonal patterns and downloadable historical data",
-              ]}
-            />
-          </div>
-        ) : (
         <div className="card shadow-sm border-0 p-4">
           <div className="d-flex flex-column flex-md-row align-items-md-start justify-content-between mb-4 gap-3">
             <div>
@@ -988,7 +970,6 @@ const MapPage = () => {
             </div>
           )}
         </div>
-        )}
       </div>
     </div>
   );
