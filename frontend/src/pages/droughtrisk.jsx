@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useAuth } from "../auth/authcontext";
 import CoordinateForm from "../components/forms/coordinateform";
 import UnifiedMap from "../components/map/mapview";
 import WeatherIcon from "../components/ui/weathericon";
@@ -32,7 +31,6 @@ ChartJS.register(
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
 const DroughtRiskPage = () => {
-  const { recordSearch } = useAuth();
   const [coords, setCoords] = useState({ lat: 5.6037, lon: -0.1870, bounds: null });
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
@@ -83,16 +81,6 @@ const DroughtRiskPage = () => {
         setLocationName(backendName);
       }
       
-      recordSearch({
-        source: "Drought Risk",
-        name: englishName || backendName,
-        lat,
-        lon,
-        summary: res.data?.isWater
-          ? "Water body"
-          : `Drought risk: ${res.data?.prediction?.drought?.label ?? "--"}`,
-      });
-
       if (res.data?.isWater) {
         setLocationError("Analysis Unavailable: The selected location is identified as a water body. Drought risk assessment is not applicable.");
       }
