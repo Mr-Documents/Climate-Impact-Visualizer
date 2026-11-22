@@ -23,8 +23,8 @@ function AppLayout() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    ChartJS.defaults.color = theme === "dark" ? "#91a0a9" : "#687a72";
-    ChartJS.defaults.borderColor = theme === "dark" ? "rgba(132, 154, 164, .12)" : "rgba(53, 78, 70, .10)";
+    ChartJS.defaults.color = theme === "dark" ? "#bac3bc" : "#626d63";
+    ChartJS.defaults.borderColor = theme === "dark" ? "rgba(222, 232, 224, .10)" : "rgba(49, 72, 53, .12)";
     try {
       window.localStorage.setItem("climatepro-theme", theme);
     } catch (error) {

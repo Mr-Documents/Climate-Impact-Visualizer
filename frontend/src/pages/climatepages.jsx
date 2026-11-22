@@ -344,8 +344,9 @@ function ClimatePages() {
   const [location, setLocation] = useState("Global sample");
   const [applied, setApplied] = useState(false);
   const dark = theme === "dark";
-  const axisColor = dark ? "#91a0a9" : "#6b7a72";
-  const gridColor = dark ? "rgba(132, 154, 164, .12)" : "rgba(53, 78, 70, .10)";
+  const axisColor = dark ? "#bac3bc" : "#626d63";
+  const gridColor = dark ? "rgba(222, 232, 224, .10)" : "rgba(49, 72, 53, .12)";
+  const chartAccent = dark ? "#86c99b" : "#47895d";
 
   useEffect(() => {
     setVariable(page.variables[0]);
@@ -366,8 +367,8 @@ function ClimatePages() {
       datasets: [{
         label: variable,
         data,
-        borderColor: "#37bd80",
-        backgroundColor: isBar ? "rgba(55, 189, 128, .72)" : "rgba(55, 189, 128, .10)",
+        borderColor: chartAccent,
+        backgroundColor: isBar ? (dark ? "rgba(119, 174, 129, .76)" : "rgba(71, 137, 93, .72)") : (dark ? "rgba(119, 174, 129, .12)" : "rgba(71, 137, 93, .10)"),
         borderWidth: isBar ? 0 : 2,
         borderRadius: isBar ? 3 : 0,
         fill: !isBar,
