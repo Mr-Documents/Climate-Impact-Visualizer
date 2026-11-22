@@ -7,8 +7,7 @@ import DocumentationPage from "./pages/documentation";
 import DroughtRisk from "./pages/droughtrisk";
 import FloodRisk from "./pages/floodrisk";
 import MapPage from "./pages/map";
-import DashboardOverview from "./pages/overview";
-import WorkspacePage from "./pages/workspacepage";
+import ClimatePages from "./pages/climatepages";
 import { ThemeContext } from "./providers/themecontext";
 import "./App.css";
 
@@ -43,18 +42,31 @@ function AppLayout() {
           <Topbar theme={theme} onToggleTheme={toggleTheme} onMenuClick={() => setMenuOpen((open) => !open)} />
           <main className="workspace-route">
             <Routes>
-              <Route path="/" element={<DashboardOverview />} />
-              <Route path="/emissions" element={<WorkspacePage />} />
-              <Route path="/sources" element={<WorkspacePage />} />
-              <Route path="/analytics" element={<WorkspacePage />} />
-              <Route path="/insights" element={<WorkspacePage />} />
-              <Route path="/targets" element={<WorkspacePage />} />
-              <Route path="/reports" element={<WorkspacePage />} />
-              <Route path="/alerts" element={<WorkspacePage />} />
-              <Route path="/integrations" element={<WorkspacePage />} />
-              <Route path="/settings" element={<WorkspacePage />} />
-              <Route path="/climate" element={<Dashboard />} />
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/climate" element={<MapPage />} />
+              <Route path="/explorer" element={<MapPage />} />
               <Route path="/map" element={<MapPage />} />
+              <Route path="/data-explorer" element={<ClimatePages />} />
+              <Route path="/conditions" element={<ClimatePages />} />
+              <Route path="/temperature" element={<ClimatePages />} />
+              <Route path="/precipitation" element={<ClimatePages />} />
+              <Route path="/drought-analysis" element={<ClimatePages />} />
+              <Route path="/heat" element={<ClimatePages />} />
+              <Route path="/atmosphere" element={<ClimatePages />} />
+              <Route path="/sea-level" element={<ClimatePages />} />
+              <Route path="/emissions" element={<ClimatePages />} />
+              <Route path="/anomalies" element={<ClimatePages />} />
+              <Route path="/predictions" element={<ClimatePages />} />
+              <Route path="/temperature-forecast" element={<ClimatePages />} />
+              <Route path="/rainfall-forecast" element={<ClimatePages />} />
+              <Route path="/wildfire" element={<ClimatePages />} />
+              <Route path="/projections" element={<ClimatePages />} />
+              <Route path="/impact" element={<ClimatePages />} />
+              <Route path="/environmental-risk" element={<ClimatePages />} />
+              <Route path="/agriculture" element={<ClimatePages />} />
+              <Route path="/urban" element={<ClimatePages />} />
+              <Route path="/ecosystems" element={<ClimatePages />} />
+              <Route path="/communities" element={<ClimatePages />} />
               <Route path="/docs" element={<DocumentationPage />} />
               <Route path="/drought" element={<DroughtRisk />} />
               <Route path="/flood" element={<FloodRisk />} />
