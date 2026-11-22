@@ -49,13 +49,13 @@
   padding: 0 7px;
   display: flex;
   align-items: center;
-  gap: 11px;
   color: var(--text);
   text-decoration: none;
   margin-bottom: 27px;
 }
 
 .brand-lockup:hover { color: var(--text); }
+.brand-logo { display: block; width: 176px; max-width: 100%; height: 45px; object-fit: contain; object-position: left center; }
 .brand-mark {
   width: 30px;
   height: 30px;

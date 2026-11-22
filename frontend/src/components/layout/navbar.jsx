@@ -32,8 +32,7 @@ function Navbar({ onToggleTheme, theme, onCloseMenu }) {
   return (
     <aside className="workspace-sidebar">
       <NavLink className="brand-lockup" to="/" onClick={onCloseMenu}>
-        <span className="brand-mark"><FaLeaf /></span>
-        <span className="brand-name">CLIMATE<span>PRO</span></span>
+        <img src="/climate_visualizer_transparent.png" alt="Climate Impact Visualizer" className="brand-logo" />
       </NavLink>
 
       <div className="sidebar-section-label">WORKSPACE</div>
